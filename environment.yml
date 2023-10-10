@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pandas
+  - faiss-cpu
+  - h5py
+  - tqdm
+  - requests
+  - seaborn

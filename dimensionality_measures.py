@@ -60,50 +60,65 @@ def run_benchmark(k=10, runs=10):
     import requests
 
     output_file = "ans.csv"
-    if not os.path.isfile(output_file):
-        data_file = ".glove-100-angular.hdf5"
-        url = "http://ann-benchmarks.com/glove-100-angular.hdf5"
-        if not os.path.isfile(data_file):
-            with requests.get(url, stream=True) as r:
-                r.raise_for_status()
-                with open(data_file, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192): 
-                        f.write(chunk)
+    if os.path.isfile(output_file):
+        return pd.read_csv(output_file)
+    data_file = ".fashion-mnist-784-euclidean.hdf5"
+    data_file = ".glove-100-angular.hdf5"
+    url = f"http://ann-benchmarks.com/{data_file[1:]}"
+    if not os.path.isfile(data_file):
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(data_file, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192): 
+                    f.write(chunk)
 
-        with h5py.File(data_file) as hfp:
-            dataset = hfp['train'][:]
-            queries = hfp['test'][:]
-            distances = hfp['distances'][:]
+    with h5py.File(data_file) as hfp:
+        dataset = hfp['train'][:]
+        queries = hfp['test'][:10]
+        distances = hfp['distances'][:]
+        distance_metric = hfp.attrs['distance']
 
+    print("Building index for metric", distance_metric)
+    if distance_metric == "euclidean":
         index = faiss.IndexHNSWFlat(dataset.shape[1], 16)
         index.add(dataset)
+    elif distance_metric == "angular":
+        index = faiss.IndexHNSWFlat(dataset.shape[1], 16)
+        dataset /= np.linalg.norm(dataset)
+        dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+        index.add(dataset)
+    else:
+        raise Exception(f"Unsupported distance metric {distance_metric}")
+    print("Index built")
 
-        def recall(query, dataset, actual):
-            actual = actual[0]
-            k = actual.shape[0]
-            distances = np.linalg.norm(query - dataset, axis=1)
-            idxs = distances.argsort()
-            expected = idxs[:k]
-            return np.intersect1d(actual, expected).shape[0] / k
+    def compute_recall(dataset_distances, run_distances, count, epsilon=1e-3):
+        t = dataset_distances[count - 1] + epsilon
+        actual = 0
+        for d in run_distances[:count]:
+            if d <= t:
+                actual += 1
+        return float(actual) / float(count)
 
-        with open(output_file, "w") as fp:
-            print("i,lid,rc,expansion,time,recall", file=fp)
-            nqueries = queries.shape[0]
-            for i in tqdm(range(nqueries)):
-                query = queries[i,:]
-                lid, rc, expansion = compute_metrics(query, dataset, k)
 
-                qq = np.array([query]) # just to comply with faiss API
-                start = time.time()
-                for _ in range(runs):
-                    index.search(qq, k)
-                end = time.time()
-                _, nn = index.search(qq, k)
-                rec = recall(query, dataset, nn)
+    with open(output_file, "w") as fp:
+        print("i,lid,rc,expansion,time,recall", file=fp)
+        nqueries = queries.shape[0]
+        for i in tqdm(range(nqueries)):
+            query = queries[i,:]
+            lid, rc, expansion = compute_metrics(query, dataset, k)
 
-                estimate = (end - start) / runs
+            qq = np.array([query]) # just to comply with faiss API
+            # index.hnsw.efSearch = k * 2
+            run_dists, _ = index.search(qq, k)
+            run_dists = np.sqrt(run_dists[0]) # Faiss returns a matrix of squared distances
+            rec = compute_recall(distances[i,:], run_dists, k)
+            start = time.time()
+            for _ in range(runs):
+                index.search(qq, k)
+            end = time.time()
 
-                print(f"{i}, {lid}, {rc}, {expansion}, {estimate}, {rec}", file=fp)
+            estimate = (end - start) / runs
+            print(f"{i}, {lid}, {rc}, {expansion}, {estimate}, {rec}", file=fp)
 
     return pd.read_csv(output_file)
 
@@ -111,32 +126,20 @@ def run_benchmark(k=10, runs=10):
 if __name__ == "__main__":
     import seaborn as sns
     import matplotlib.pyplot as plt
+    import itertools
 
-    bench = run_benchmark(k = 100, runs = 5)
+    bench = run_benchmark(k = 20, runs = 3)
 
-    print(bench.drop("i", axis=1).corr())
+    print(bench.drop("i", axis=1).corr('spearman'))
+    print("minimum recall", bench['recall'].min())
 
-    plt.figure()
-    sns.scatterplot(
-        data = bench,
-        y    = "recall",
-        x    = "lid"
-    )
-    plt.savefig("imgs/scatter-recall-lid.png")
+    for x, y in itertools.combinations(["expansion", "lid", "rc", "recall", "time"], 2):
+        plt.figure()
+        sns.scatterplot(
+            data = bench,
+            y    = y,
+            x    = x
+        )
+        plt.savefig(f"imgs/scatter-{x}-{y}.png")
 
-    plt.figure()
-    sns.scatterplot(
-        data = bench,
-        y    = "recall",
-        x    = "rc"
-    )
-    plt.savefig("imgs/scatter-recall-rc.png")
-
-    plt.figure()
-    sns.scatterplot(
-        data = bench,
-        y    = "recall",
-        x    = "expansion"
-    )
-    plt.savefig("imgs/scatter-recall-expansion.png")
 
