@@ -37,11 +37,37 @@ def compute_expansion(distances, k, scale="log"):
     else:
         return distances[2*k] / distances[k]
 
+def compute(query, dataset, metric, k, distance_metric="euclidean"):
+    assert len(query) == dataset.shape[1], f"Query shape {len(query)}, dataset dimensions {dataset.shape[1]}"
+    if distance_metric == "euclidean":
+        distances = np.linalg.norm(query - dataset, axis=1)
+    else:
+        distances = 1 - np.dot(dataset, query)
+    np.ndarray.sort(distances)
+    if metric == "lid":
+        return compute_lid(distances, k, scale="linear")
+    elif metric == "loglid":
+        return compute_lid(distances, k, scale="log")
+    elif metric == "logrc":
+        return compute_rc(distances, k, scale="log")
+    elif metric == "rc":
+        return compute_rc(distances, k, scale="linear")
+    elif metric == "logexpansion":
+        return compute_expansion(distances, k, scale="log")
+    elif metric == "expansion":
+        return compute_expansion(distances, k, scale="linear")
+    else:
+        raise Exception(f"Unknown metric {metric}")
 
-def compute_metrics(query, dataset, k, scale="log"):
+def compute_metrics(query, dataset, k, scale="log", distance_metric="euclidean"):
     assert query.shape[0] == dataset.shape[1], "data and query are expected to have the same dimension"
 
-    distances = np.linalg.norm(query - dataset, axis=1)
+    if distance_metric == "euclidean":
+        distances = np.linalg.norm(query - dataset, axis=1)
+    elif distance_metric == "angular":
+        distances = 1 - np.dot(dataset, query)
+    else:
+        raise Exception("unknown distance metric")
     np.ndarray.sort(distances)
 
     lid = compute_lid(distances, k, scale)
@@ -49,5 +75,20 @@ def compute_metrics(query, dataset, k, scale="log"):
     expansion = compute_expansion(distances, k, scale)
 
     return lid, rc, expansion
+
+
+if __name__ == "__main__":
+    import tqdm
+    import sys
+    import bench
+    dataname = sys.argv[1]
+    dataset, queries, distances, distance_metric = bench.load_dataset(dataname)
+
+    k = 10
+
+    print("i,lid,rc,expansion")
+    for i, q in tqdm.tqdm(enumerate(queries), total=queries.shape[0]):
+        lid, rc, expansion = compute_metrics(q, dataset, k, distance_metric=distance_metric, scale="linear")
+        print(f"{i},{lid},{rc},{expansion}")
 
 
