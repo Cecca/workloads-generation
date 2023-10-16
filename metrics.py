@@ -121,7 +121,6 @@ def compute_rc(distances, k, scale="log"):
         return avg_dist / distances[k]
 
 
-
 def compute_expansion(distances, k, scale="log"):
     if scale == "log":
         return np.log( distances[2*k] / distances[k] )
@@ -175,8 +174,6 @@ if __name__ == "__main__":
         print("Usage: python filename.py dataset_file query_file k [optional:epsilon as list with spaces]")
         sys.exit(1)
 
-    # data_path = sys.argv[1]
-    # query_path = sys.argv[2]
     dataset_name = sys.argv[1]
     queryset_name = sys.argv[2]
     k_value = int(sys.argv[3])
@@ -191,10 +188,6 @@ if __name__ == "__main__":
     data_samples, data_features = 0, 0
 
     epsilons_str = '_'.join(str(e) for e in epsilons)
-
-
-    # dataset_name = data_path.split('/')[-1].split('.')[0]
-    # queryset_name = query_path.sDplit('/')[-1].split('.')[0]
 
     data_path = DATASETS[dataset_name]
     query_path = WORKLOADS[queryset_name]
@@ -213,22 +206,12 @@ if __name__ == "__main__":
                         f.write(chunk)
         dataset, queries = read_from_hdf5(data_path)
     elif data_path.endswith('.bin'):
-
-        
-        # data_filename = dataset_name.split('-')
-        # data_samples = str_to_digits(data_filename[2])
-        # data_features = int(data_filename[1])
         data_samples, data_features = parse_filename(data_path)
-
-        # query_filename = queryset_name.split('-')
-        # query_samples = str_to_digits(query_filename[2])
-        # query_features = int(query_filename[1])
         query_samples, query_features = parse_filename(query_path)
 
         assert data_features == query_features
 
         dataset = np.fromfile(data_path, dtype='float32', count=data_features*data_limit).reshape(data_limit, data_features)
-
         queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)
         
     else:
@@ -236,7 +219,6 @@ if __name__ == "__main__":
         sys.exit
 
     output_file = f"res_{dataset_name}_{queryset_name}_{k_value}_{epsilons_str}"
-
     
     # index = build_index(dataset)
 
