@@ -5,6 +5,7 @@ import pandas as pd
 
 
 def compute_lid(distances, k, scale="log"):
+    assert len(distances) >= k
     w = distances[min(len(distances) - 1, k)]
     half_w = 0.5 * w
 
@@ -17,6 +18,7 @@ def compute_lid(distances, k, scale="log"):
     s = np.log(small / w).sum() + np.log1p((large - w) / w).sum()
     valid = small.size + large.size
 
+    assert s != 0
     if scale == "log":
         return np.log(-valid / s)
     else:
@@ -44,6 +46,7 @@ def compute(query, dataset, metric, k, distance_metric="euclidean"):
     else:
         distances = 1 - np.dot(dataset, query)
     np.ndarray.sort(distances)
+    assert (distances >= 0).all()
     if metric == "lid":
         return compute_lid(distances, k, scale="linear")
     elif metric == "loglid":

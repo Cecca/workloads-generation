@@ -10,6 +10,7 @@ import dimensionality_measures as dm
 
 DATASETS = {
     "fashion-mnist": ".fashion-mnist-784-euclidean.hdf5",
+    "mnist": ".mnist-784-euclidean.hdf5",
     "glove-100": ".glove-100-angular.hdf5",
     "glove-25": ".glove-25-angular.hdf5"
 }
@@ -32,6 +33,7 @@ def load_dataset(name, nqueries = None):
             queries = hfp['test'][:]
         distances = hfp['distances'][:]
         distance_metric = hfp.attrs['distance']
+    print("metric for dataset", name, "is", distance_metric)
 
     if distance_metric == "angular":
         dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
