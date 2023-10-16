@@ -1,6 +1,4 @@
-.fashion-mnist-784-euclidean.hdf5
-.glove-100-angular.hdf5
+*.hdf5
 ans.csv
 __pycache__
 imgs
-.glove-25-angular.hdf5
