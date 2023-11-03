@@ -77,19 +77,16 @@ def read_sys_argv_list(start_index=4):
         return None
 
 def get_epsilons(queries, dataset):
+    max_dist_arr = [get_distances(qq, dataset)[-1] for qq in queries]
+    mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
-    max_dist = max([get_distances(qq, dataset)[-1] for qq in queries])
+    return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
 
-    return [max_dist*r for r in [0.001, 0.01, 0.05]]
-
-def build_index(dataset, n_list):
+def build_index(dataset, n_list, distance_metric):
     print("Building index")
     
     quantizer = faiss.IndexFlatL2(dataset.shape[1])
     index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    # if distance_metric == "angular":
-    #     dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-    #     queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
     index.train(dataset)
     index.add(dataset)
     print("Index built")
@@ -131,7 +128,7 @@ if __name__ == "__main__":
         print("Usage: python metrics.py dataset_file query_file k [optional:epsilon as list with spaces] [optional:data_limit] [optional:query_limit]")
         sys.exit(1)
     
-    dataset, queries, dataset_distances, distance_metric = rd.read_data(dataset_name, queryset_name, data_limit, query_limit)
+    dataset, queries, distances, distance_metric = rd.read_data(dataset_name, queryset_name, data_limit, query_limit)
 
     epsilons = None
 
@@ -148,47 +145,47 @@ if __name__ == "__main__":
     
     target_recall = 0.95
     n_list = 32
-    # index = build_index(dataset, n_list)
+    index = build_index(dataset, n_list, distance_metric)
 
     with open(output_file+'.csv', "w", newline="") as fp:
         writer = csv.writer(fp)
 
         header = ["i", "lid_"+str(k_value), "rc_"+str(k_value), f"exp_{2*k_value}|{k_value}"]
-        header.extend(["eps_" + str(e) for e in epsilons])
+        header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
         writer.writerow(header)
 
         nqueries = queries.shape[0]
         for i in tqdm(range(nqueries)):
             query = queries[i,:]  
-            q_distances = get_distances(query, dataset)
+            q_distances = get_distances(query, dataset, distance_metric)
             lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
             
             row = [i, lid, rc, expansion]
             row.extend(epsilons_hard)
 
-            # qq = np.array([query]) # just to comply with faiss API
-            # distcomp = None
-            # elapsed = None
-            # for nprobe in range(1,1000):
-            #     faiss.cvar.indexIVF_stats.reset()
-            #     index.nprobe = nprobe
-            #     tstart = time.time()
-            #     run_dists = index.search(qq, k_value)[0][0]
-            #     tend = time.time()
-            #     elapsed = tend - tstart
-            # #     # if distance_metric == "angular":
-            # #     #     # The index returns squared euclidean distances, 
-            # #     #     # which we turn to angular distances in the following
-            # #     #     run_dists = 1 - (2 - run_dists) / 2
-            # #     # else:
-            # #     #     assert False, "fix this branch"
-            #     rec = compute_recall(q_distances, run_dists, k_value)
-            #     print(rec)
-            #     if rec >= target_recall:
-            #         distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
-            #         break
+            qq = np.array([query]) # just to comply with faiss API
+            distcomp = None
+            elapsed = None
+            for nprobe in range(1,1000):
+                faiss.cvar.indexIVF_stats.reset()
+                index.nprobe = nprobe
+                tstart = time.time()
+                run_dists = index.search(qq, k_value)[0][0]
+                tend = time.time()
+                elapsed = tend - tstart
+                if distance_metric == "angular":
+                    # The index returns squared euclidean distances, 
+                    # which we turn to angular distances in the following
+                    run_dists = 1 - (2 - run_dists) / 2
+                # else:
+                #     assert False, "fix this branch"
+                rec = compute_recall(distances[i,:], run_dists, k_value)
+                # print(rec)
+                if rec >= target_recall:
+                    distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
+                    break
 
-            # assert distcomp is not None
-            # row.extend([distcomp, rec, elapsed])
+            assert distcomp is not None
+            row.extend([distcomp, rec, elapsed])
 
             writer.writerow(row)

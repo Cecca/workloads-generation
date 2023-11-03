@@ -1,6 +1,7 @@
 import h5py
 import os
 import numpy as np
+import requests
 
 dataset_path="/data/qwang/datasets/"
 noise_q_path="/mnt/hddhelp/ts_benchmarks/datasets/workloads_karima/sald/"
@@ -13,9 +14,9 @@ DATASETS = {
 "rw": f"{dataset_path}rw-256-100m.bin",
 "seismic": f"{dataset_path}seismic-256-100m.bin",
 "sald": f"{dataset_path}sald-128-100m.bin",
-"fashion-mnist": ".fashion-mnist-784-euclidean.hdf5",
-"glove-100": ".glove-100-angular.hdf5",
-"glove-25": ".glove-25-angular.hdf5",
+"fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
+"glove-100": "glove-100-angular.hdf5",
+"glove-25": "glove-25-angular.hdf5",
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
 "sift": "sift-128-euclidean.hdf5"
@@ -33,20 +34,20 @@ WORKLOADS = {
 "sald-noise-30": f"{noise_q_path}sald-128-10k-hard30p-znorm.bin",
 "sald-noise-10": f"{noise_q_path}sald-128-10k-hard10p-znorm.bin",
 "sald-noise-1": f"{noise_q_path}sald-128-10k-hard1p-znorm.bin",
-"fashion-mnist": ".fashion-mnist-784-euclidean.hdf5",
-"glove-100": ".glove-100-angular.hdf5",
-"glove-25": ".glove-25-angular.hdf5",
+"fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
+"glove-100": "glove-100-angular.hdf5",
+"glove-25": "glove-25-angular.hdf5",
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
 "sift": "sift-128-euclidean.hdf5"
 }
 
-def read_from_hdf5(filename):
+def read_from_hdf5(filename, data_limit, query_limit):
         with h5py.File(filename) as hfp:
-            # dataset = hfp['train'][:data_limit]
-            # queries = hfp['test'][:query_limit]
-            dataset = hfp['train'][:]
-            queries = hfp['test'][:]
+            dataset = hfp['train'][:data_limit]
+            queries = hfp['test'][:query_limit]
+            # dataset = hfp['train'][:]
+            # queries = hfp['test'][:]
 
             distances = hfp['distances'][:]
             distance_metric = hfp.attrs['distance']
@@ -74,14 +75,14 @@ def read_data(dataset_name, queryset_name,data_limit, query_limit):
         distances = get_distances(dataset)
         distance_metric = "euclidean"
     elif data_path.endswith('.hdf5'): 
-        url = "http://ann-benchmarks.com/" + data_path
+        url = f"http://ann-benchmarks.com/{data_path}"
         if not os.path.isfile(data_path):
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
                 with open(data_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
-        dataset, queries, distances, distance_metric = read_from_hdf5(data_path)
+        dataset, queries, distances, distance_metric = read_from_hdf5(data_path, data_limit, query_limit)
     elif data_path.endswith('.bin'):
         data_samples, data_features = parse_filename(data_path)
         query_samples, query_features = parse_filename(query_path)
@@ -96,6 +97,10 @@ def read_data(dataset_name, queryset_name,data_limit, query_limit):
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit
+
+    if distance_metric == "angular":
+        dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+        queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
 
     return dataset, queries, distances, distance_metric
 
