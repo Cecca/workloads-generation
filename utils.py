@@ -8,9 +8,32 @@ DATASETS = {
 }
 
 
-def compute_distances(query, k, metric, faiss_index=None, dataset=None):
-    assert faiss_index is not None or dataset is not None, "you should provide either an index or the data itself"
-    if faiss_index is not None:
+def compute_distances(query, k, metric, data_or_index):
+    """
+    Compute the k smallest distances from the given query in the
+    specified metric space. The last argument can be either:
+
+      - a dataset, in which case the distance is brute forced, 
+      - or a FAISS index to be used to answer the query
+
+    The function applies the appropriate adjustments so that the output is:
+
+      - the Euclidean distance (not squared) is `metric="euclidean"`
+      - the angular distance (i.e. 1 - dot(q,d), with q being the query 
+        and d a data point) if `metric="angular"`
+    """
+    if hasattr(data_or_index, 'shape'):
+        dataset = data_or_index
+        if metric == "angular":
+            dists = 1 - np.dot(dataset, query) 
+        elif metric == "euclidean":
+            dists = np.linalg.norm(query - dataset, axis=1)
+        else:
+            raise RuntimeError("unknown distance" + metric)
+        dists = np.partition(dists, k)[:k]
+        return np.sort(dists)
+    else:
+        faiss_index = data_or_index
         qq = np.array([query]) # just to comply with faiss API
         dists = faiss_index.search(qq, k)[0][0]
         if metric == "angular":
@@ -22,19 +45,13 @@ def compute_distances(query, k, metric, faiss_index=None, dataset=None):
             return np.sqrt(dists)
         else:
             raise RuntimeError("unknown distance" + metric)
-    elif dataset is not None:
-        if metric == "angular":
-            dists = 1 - np.dot(dataset, query) 
-        elif metric == "euclidean":
-            dists = np.linalg.norm(query - dataset, axis=1)
-        else:
-            raise RuntimeError("unknown distance" + metric)
-        dists = np.partition(dists, k)[:k]
-        return np.sort(dists)
-
 
 
 def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
+    """
+    Compute the recall against the given ground truth, for `count` 
+    number of neighbors.
+    """
     t = ground_distances[count - 1] + epsilon
     actual = 0
     for d in run_distances[:count]:
@@ -44,6 +61,9 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
 
 
 def load_dataset(name, nqueries = None):
+    """
+    Load a hdf5 dataset, possibly downloading it from ann-benchmarks
+    """
     import requests
     import h5py
     import os
@@ -73,6 +93,7 @@ def load_dataset(name, nqueries = None):
 
 
 if __name__ == "__main__":
+    # Here we check that the distance-computing function makes sense.
     import faiss
 
     dataset_name = "fashion-mnist"
@@ -83,7 +104,7 @@ if __name__ == "__main__":
 
     # Check that the brute force distance computation is correct
     for i, q in enumerate(queries):
-        dists = compute_distances(q, k, distance_metric, dataset=dataset)
+        dists = compute_distances(q, k, distance_metric, dataset)
         ground = distances[i,:k]
         assert np.all( np.abs(dists - ground) < 0.001 )
     print("Exact search all OK")
@@ -96,7 +117,7 @@ if __name__ == "__main__":
     index.add(dataset)
     index.nprobe = 32
     for i, q in enumerate(queries):
-        dists = compute_distances(q, k, distance_metric, faiss_index=index)
+        dists = compute_distances(q, k, distance_metric, index)
         ground = distances[i,:k]
         rec = compute_recall(ground, dists, k)
         assert rec >= 0.95
