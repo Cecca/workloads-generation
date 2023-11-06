@@ -76,8 +76,8 @@ def read_sys_argv_list(start_index=4):
     else:
         return None
 
-def get_epsilons(queries, dataset):
-    max_dist_arr = [get_distances(qq, dataset)[-1] for qq in queries]
+def get_epsilons(queries, dataset, distance_metric):
+    max_dist_arr = [get_distances(qq, dataset, distance_metric)[-1] for qq in queries]
     mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
     return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     if epsilon is not None:
         epsilons = [float(x) for x in opt_params]
     else: 
-        epsilons = get_epsilons(queries[:int(sample*len(queries))+1], dataset)
+        epsilons = get_epsilons(queries[:int(sample*len(queries))+1], dataset, distance_metric)
 
     epsilons_str = '_'.join(f'{e:.2f}' for e in epsilons)
     print (f'e-values (based on {sample} query sample): {epsilons_str}')
@@ -145,8 +145,15 @@ if __name__ == "__main__":
     
     target_recall = 0.95
     n_list = 32
-    index = build_index(dataset, n_list, distance_metric)
+    # index = build_index(dataset, n_list, distance_metric)
+    print("Building index")
+    quantizer = faiss.IndexFlatL2(dataset.shape[1])
+    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+    index.train(dataset)
+    index.add(dataset)
+    print("Index built")
 
+    flag = True
     with open(output_file+'.csv', "w", newline="") as fp:
         writer = csv.writer(fp)
 
@@ -170,7 +177,7 @@ if __name__ == "__main__":
                 faiss.cvar.indexIVF_stats.reset()
                 index.nprobe = nprobe
                 tstart = time.time()
-                run_dists = index.search(qq, k_value)[0][0]
+                run_dists = index.search(qq, k_value)[0][0] 
                 tend = time.time()
                 elapsed = tend - tstart
                 if distance_metric == "angular":
@@ -179,7 +186,16 @@ if __name__ == "__main__":
                     run_dists = 1 - (2 - run_dists) / 2
                 # else:
                 #     assert False, "fix this branch"
-                rec = compute_recall(distances[i,:], run_dists, k_value)
+                if distances is not None:
+                    q_dists =  distances[i,:]
+                else:
+                    q_dists = q_distances
+                #debug    
+                if flag:
+                    print(f"run_dist: {run_dists} \n q_dist {q_dists}")
+                    flag = False
+
+                rec = compute_recall(q_dists, run_dists, k_value)
                 # print(rec)
                 if rec >= target_recall:
                     distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
