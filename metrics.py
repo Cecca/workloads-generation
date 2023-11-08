@@ -56,20 +56,6 @@ def compute_metrics(distances, epsilons, k, scale="log"):
 
     return lid, rc, expansion, epsilons_hardness
 
-def get_distances(query, dataset, distance_metric="euclidean"):
-    assert query.shape[0] == dataset.shape[1], "data and query are expected to have the same dimension"
-
-    # distances = np.linalg.norm(dataset - query, axis=1)  # Euclidean distance
-    if distance_metric == "euclidean":
-        distances = np.linalg.norm(query - dataset, axis=1)
-    elif distance_metric == "angular":
-        distances = 1 - np.dot(dataset, query)
-    else:
-        raise Exception("unknown distance metric")
-    
-    np.ndarray.sort(distances) 
-
-    return distances
 
 def read_sys_argv_list(start_index=4):
     if len(sys.argv) >= start_index + 1:
@@ -78,7 +64,7 @@ def read_sys_argv_list(start_index=4):
         return None
 
 def get_epsilons(queries, dataset, distance_metric):
-    max_dist_arr = [get_distances(qq, dataset, distance_metric)[-1] for qq in queries]
+    max_dist_arr [compute_distances(qq, None, distance_metric, dataset) for qq in queries]
     mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
     return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]

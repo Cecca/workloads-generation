@@ -21,6 +21,8 @@ def compute_distances(query, k, metric, data_or_index):
       - the Euclidean distance (not squared) is `metric="euclidean"`
       - the angular distance (i.e. 1 - dot(q,d), with q being the query 
         and d a data point) if `metric="angular"`
+
+    If `k` is None, then all distances are returned
     """
     if len(query.shape) == 2:
         # We were given multiple queries
@@ -36,11 +38,14 @@ def compute_distances(query, k, metric, data_or_index):
             dists = np.linalg.norm(query - dataset, axis=1)
         else:
             raise RuntimeError("unknown distance" + metric)
-        dists = np.partition(dists, k)[:k]
+        if k is not None:
+            dists = np.partition(dists, k)[:k]
         return np.sort(dists)
     else:
         faiss_index = data_or_index
         qq = np.array([query]) # just to comply with faiss API
+        if k is None:
+            k = faiss_index.ntotal
         dists = faiss_index.search(qq, k)[0][0]
         if metric == "angular":
             # The index returns squared euclidean distances, 
