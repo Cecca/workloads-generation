@@ -22,6 +22,12 @@ def compute_distances(query, k, metric, data_or_index):
       - the angular distance (i.e. 1 - dot(q,d), with q being the query 
         and d a data point) if `metric="angular"`
     """
+    if len(query.shape) == 2:
+        # We were given multiple queries
+        return np.array([
+            compute_distances(q, k, metric, data_or_index)
+            for q in query
+        ])
     if hasattr(data_or_index, 'shape'):
         dataset = data_or_index
         if metric == "angular":
@@ -59,67 +65,4 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
             actual += 1
     return float(actual) / float(count)
 
-
-def load_dataset(name, nqueries = None):
-    """
-    Load a hdf5 dataset, possibly downloading it from ann-benchmarks
-    """
-    import requests
-    import h5py
-    import os
-
-    data_file = DATASETS[name]
-    url = f"http://ann-benchmarks.com/{data_file[1:]}"
-    if not os.path.isfile(data_file):
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(data_file, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192): 
-                    f.write(chunk)
-
-    with h5py.File(data_file) as hfp:
-        dataset = hfp['train'][:]
-        if nqueries is not None:
-            queries = hfp['test'][:nqueries]
-        else:
-            queries = hfp['test'][:]
-        distances = hfp['distances'][:]
-        distance_metric = hfp.attrs['distance']
-
-    if distance_metric == "angular":
-        dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-        queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-    return dataset, queries, distances, distance_metric
-
-
-if __name__ == "__main__":
-    # Here we check that the distance-computing function makes sense.
-    import faiss
-
-    dataset_name = "fashion-mnist"
-    dataset, queries, distances, distance_metric = load_dataset(
-        dataset_name, nqueries=100)
-
-    k = 10
-
-    # Check that the brute force distance computation is correct
-    for i, q in enumerate(queries):
-        dists = compute_distances(q, k, distance_metric, dataset)
-        ground = distances[i,:k]
-        assert np.all( np.abs(dists - ground) < 0.001 )
-    print("Exact search all OK")
-
-    # Check that the approximate distance computation gives a reasonable recall
-    n_list = 32
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    index.nprobe = 32
-    for i, q in enumerate(queries):
-        dists = compute_distances(q, k, distance_metric, index)
-        ground = distances[i,:k]
-        rec = compute_recall(ground, dists, k)
-        assert rec >= 0.95
-    print("Approximate search all OK")
 

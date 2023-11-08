@@ -2,6 +2,7 @@ import h5py
 import os
 import numpy as np
 import requests
+from utils import compute_distances
 
 dataset_path="/data/qwang/datasets/"
 noise_q_path="/mnt/hddhelp/ts_benchmarks/datasets/workloads_karima/sald/"
@@ -42,15 +43,26 @@ WORKLOADS = {
 "sift": "sift-128-euclidean.hdf5"
 }
 
-def read_from_hdf5(filename, data_limit, query_limit):
+def read_from_hdf5(filename, data_limit=None, query_limit=None):
         with h5py.File(filename) as hfp:
-            dataset = hfp['train'][:data_limit]
-            queries = hfp['test'][:query_limit]
-            # dataset = hfp['train'][:]
-            # queries = hfp['test'][:]
-
-            distances = hfp['distances'][:]
             distance_metric = hfp.attrs['distance']
+
+            if query_limit is not None:
+                queries = hfp['test'][:query_limit]
+            else:
+                queries = hfp['test'][:]
+
+            if data_limit is not None:
+                dataset = hfp['train'][:data_limit]
+                # We have to recompute the distances, because the `distances`
+                # matrix stored in the hdf5 file is relative to the _entire_
+                # dataset, not parts of it
+                print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
+                distances = compute_distances(queries, 100, distance_metric, dataset)
+            else:
+                dataset = hfp['train'][:]
+                distances = hfp['distances'][:]
+
         return dataset, queries, distances, distance_metric
 
 def read_from_txt(filename):
@@ -62,7 +74,7 @@ def read_from_bin(filename, sids, sdim):
 
     return data.reshape(sids,sdim)
 
-def read_data(dataset_name, queryset_name,data_limit, query_limit):
+def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
     data_path = DATASETS[dataset_name]
     query_path = WORKLOADS[queryset_name]
 
@@ -72,8 +84,8 @@ def read_data(dataset_name, queryset_name,data_limit, query_limit):
     if data_path.endswith('.txt') and query_path.endswith('.txt'):
         dataset = read_from_txt(data_path)
         queries = read_from_txt(query_path)
-        distances = get_distances(dataset)
         distance_metric = "euclidean"
+        distances = compute_distances(queries, 100, distance_metric, dataset)
     elif data_path.endswith('.hdf5'): 
         url = f"http://ann-benchmarks.com/{data_path}"
         if not os.path.isfile(data_path):
@@ -87,13 +99,15 @@ def read_data(dataset_name, queryset_name,data_limit, query_limit):
         data_samples, data_features = parse_filename(data_path)
         query_samples, query_features = parse_filename(query_path)
 
+        assert data_limit is not None
+        assert query_limit is not None
         assert data_features == query_features
 
         dataset = np.fromfile(data_path, dtype='float32', count=data_features*data_limit).reshape(data_limit, data_features)
         queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)
         
-        distances = get_distances(dataset)
         distance_metric = "euclidean"
+        distances = compute_distances(queries, 100, distance_metric, dataset)
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit
@@ -122,7 +136,36 @@ def parse_filename(filepath):
 
     return samples, features
 
-def get_distances(dataset,distance_metric="euclidean"):
-    #TODO
-    distances = None
-    return distances
+
+# Test a few things
+if __name__ == "__main__":
+    # Here we check that the distance-computing function makes sense.
+    import faiss
+    from utils import compute_recall
+
+    dataset_name = "fashion-mnist"
+    dataset, queries, distances, distance_metric = read_data(
+        dataset_name, dataset_name, data_limit=None, query_limit=10)
+
+    k = 10
+
+    # Check that the brute force distance computation is correct
+    dists = compute_distances(queries, k, distance_metric, dataset)
+    ground = distances[:len(dists), :k]
+    assert np.all(np.abs(dists - ground) < 0.0001)
+    print("Exact search all OK")
+
+    # Check that the approximate distance computation gives a reasonable recall
+    n_list = 32
+    quantizer = faiss.IndexFlatL2(dataset.shape[1])
+    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+    index.train(dataset)
+    index.add(dataset)
+    index.nprobe = 32
+    for i, q in enumerate(queries):
+        dists = compute_distances(q, k, distance_metric, index)
+        ground = distances[i,:k]
+        rec = compute_recall(ground, dists, k)
+        assert rec >= 0.95
+    print("Approximate search all OK")
+

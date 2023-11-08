@@ -6,6 +6,7 @@ import csv
 import faiss
 import time
 import read_data as rd
+from utils import *
 
 def compute_epsilon_hardness(distances, epsilon):
     min_dist = distances[0]
@@ -93,13 +94,6 @@ def build_index(dataset, n_list, distance_metric):
 
     return index
 
-def compute_recall(distances, run_distances, count, epsilon=1e-3):
-    t = distances[count - 1] + epsilon 
-    actual = 0
-    for d in run_distances[:count]:
-        if d <= t:
-            actual += 1
-    return float(actual) / float(count)
 
 if __name__ == "__main__":
 
@@ -164,7 +158,7 @@ if __name__ == "__main__":
         nqueries = queries.shape[0]
         for i in tqdm(range(nqueries)):
             query = queries[i,:]  
-            q_distances = get_distances(query, dataset, distance_metric)
+            q_distances = compute_distances(query, 100, distance_metric, dataset)
             lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
             
             row = [i, lid, rc, expansion]
@@ -177,15 +171,9 @@ if __name__ == "__main__":
                 faiss.cvar.indexIVF_stats.reset()
                 index.nprobe = nprobe
                 tstart = time.time()
-                run_dists = index.search(qq, k_value)[0][0] 
+                run_dists = compute_distances(query, k_value, distance_metric, index)
                 tend = time.time()
                 elapsed = tend - tstart
-                if distance_metric == "angular":
-                    # The index returns squared euclidean distances, 
-                    # which we turn to angular distances in the following
-                    run_dists = 1 - (2 - run_dists) / 2
-                # else:
-                #     assert False, "fix this branch"
                 if distances is not None:
                     q_dists =  distances[i,:]
                 else:
