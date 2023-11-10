@@ -58,7 +58,7 @@ def read_from_hdf5(filename, data_limit=None, query_limit=None):
                 # matrix stored in the hdf5 file is relative to the _entire_
                 # dataset, not parts of it
                 print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
-                distances = compute_distances(queries, 100, distance_metric, dataset)
+                distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
             else:
                 dataset = hfp['train'][:]
                 distances = hfp['distances'][:]
@@ -99,9 +99,14 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         data_samples, data_features = parse_filename(data_path)
         query_samples, query_features = parse_filename(query_path)
 
-        assert data_limit is not None
-        assert query_limit is not None
+        # assert data_limit is not None
+        # assert query_limit is not None
         assert data_features == query_features
+
+        if data_limit is None:
+            data_limit = data_samples
+        if query_limit is None:
+            query_limit = query_samples
 
         dataset = np.fromfile(data_path, dtype='float32', count=data_features*data_limit).reshape(data_limit, data_features)
         queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)

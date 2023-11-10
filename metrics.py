@@ -48,9 +48,9 @@ def compute_expansion(distances, k, scale="log"):
 
 def compute_metrics(distances, epsilons, k, scale="log"):
    
-    lid = compute_lid(distances, k, scale)
-    rc = compute_rc(distances, k, scale)
-    expansion = compute_expansion(distances, k, scale)
+    lid = compute_lid(distances, k-1, scale)
+    rc = compute_rc(distances, k-1, scale)
+    expansion = compute_expansion(distances, k-1, scale)
 
     epsilons_hardness = [compute_epsilon_hardness(distances, e) for e in epsilons]
 
@@ -64,7 +64,8 @@ def read_sys_argv_list(start_index=4):
         return None
 
 def get_epsilons(queries, dataset, distance_metric):
-    max_dist_arr [compute_distances(qq, None, distance_metric, dataset) for qq in queries]
+    max_dist_arr = [compute_distances(qq, None, distance_metric, dataset)[-1] for qq in queries]
+    print(max_dist_arr)
     mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
     return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
@@ -88,8 +89,8 @@ if __name__ == "__main__":
     parser.add_argument('--query', required=True, help='Path to the query file')
     parser.add_argument('--k', type=int, required=True, help='Number of nearest neighbors to find')
     parser.add_argument('--epsilon', type=float, nargs='+', help='List of epsilon values to use')
-    parser.add_argument('--data_limit', type=int, default=1000000, help='Maximum number of data points to load from the dataset file')
-    parser.add_argument('--query_limit', type=int, default=10000, help='Maximum number of query points to load from the query file')
+    parser.add_argument('--data_limit', type=int,  help='Maximum number of data points to load from the dataset file')
+    parser.add_argument('--query_limit', type=int,  help='Maximum number of query points to load from the query file')
     parser.add_argument('--sample', type=float, default=0.05, help='Fraction of query set used to calculate epsilons')
 
     args = parser.parse_args()
@@ -125,13 +126,7 @@ if __name__ == "__main__":
     
     target_recall = 0.95
     n_list = 32
-    # index = build_index(dataset, n_list, distance_metric)
-    print("Building index")
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    print("Index built")
+    index = build_index(dataset, n_list, distance_metric)
 
     flag = True
     with open(output_file+'.csv', "w", newline="") as fp:
@@ -144,13 +139,13 @@ if __name__ == "__main__":
         nqueries = queries.shape[0]
         for i in tqdm(range(nqueries)):
             query = queries[i,:]  
-            q_distances = compute_distances(query, 100, distance_metric, dataset)
+            q_distances = compute_distances(query, None, distance_metric, dataset)
             lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
             
             row = [i, lid, rc, expansion]
             row.extend(epsilons_hard)
 
-            qq = np.array([query]) # just to comply with faiss API
+            # qq = np.array([query]) # just to comply with faiss API
             distcomp = None
             elapsed = None
             for nprobe in range(1,1000):
