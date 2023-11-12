@@ -30,9 +30,14 @@ def compute_distances(query, k, metric, data_or_index):
             compute_distances(q, k, metric, data_or_index)
             for q in query
         ])
+
+    if metric == "angular":
+        assert np.isclose(1.0, np.linalg.norm(query)), f"query should have unit norm, has norm {np.linalg.norm(query)} instead"
+
     if hasattr(data_or_index, 'shape'):
         dataset = data_or_index
         if metric == "angular":
+            assert np.allclose(1.0, np.linalg.norm(dataset, axis=1)), "Data points should have unit norm"
             dists = 1 - np.dot(dataset, query) 
         elif metric == "euclidean":
             dists = np.linalg.norm(query - dataset, axis=1)

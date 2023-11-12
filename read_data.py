@@ -44,26 +44,29 @@ WORKLOADS = {
 }
 
 def read_from_hdf5(filename, data_limit=None, query_limit=None):
-        with h5py.File(filename) as hfp:
-            distance_metric = hfp.attrs['distance']
+    with h5py.File(filename) as hfp:
+        distance_metric = hfp.attrs['distance']
 
-            if query_limit is not None:
-                queries = hfp['test'][:query_limit]
-            else:
-                queries = hfp['test'][:]
+        if query_limit is not None:
+            queries = hfp['test'][:query_limit]
+        else:
+            queries = hfp['test'][:]
 
-            if data_limit is not None:
-                dataset = hfp['train'][:data_limit]
-                # We have to recompute the distances, because the `distances`
-                # matrix stored in the hdf5 file is relative to the _entire_
-                # dataset, not parts of it
-                print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
-                distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
-            else:
-                dataset = hfp['train'][:]
-                distances = hfp['distances'][:]
+        if data_limit is not None:
+            dataset = hfp['train'][:data_limit]
+            # We have to recompute the distances, because the `distances`
+            # matrix stored in the hdf5 file is relative to the _entire_
+            # dataset, not parts of it
+            print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
+            if distance_metric == "angular":
+                dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+                queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
+            distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
+        else:
+            dataset = hfp['train'][:]
+            distances = hfp['distances'][:]
 
-        return dataset, queries, distances, distance_metric
+    return dataset, queries, distances, distance_metric
 
 def read_from_txt(filename):
     data = np.loadtxt(filename)
@@ -86,7 +89,7 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         queries = read_from_txt(query_path)
         distance_metric = "euclidean"
         distances = compute_distances(queries, 100, distance_metric, dataset)
-    elif data_path.endswith('.hdf5'): 
+    elif data_path.endswith('.hdf5'):
         url = f"http://ann-benchmarks.com/{data_path}"
         if not os.path.isfile(data_path):
             with requests.get(url, stream=True) as r:
@@ -115,7 +118,7 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         distances = compute_distances(queries, 100, distance_metric, dataset)
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
-        sys.exit
+        sys.exit()
 
     if distance_metric == "angular":
         dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
@@ -148,16 +151,16 @@ if __name__ == "__main__":
     import faiss
     from utils import compute_recall
 
-    dataset_name = "fashion-mnist"
+    dataset_name = "glove-100"
     dataset, queries, distances, distance_metric = read_data(
-        dataset_name, dataset_name, data_limit=None, query_limit=10)
+        dataset_name, dataset_name, data_limit=10000, query_limit=10)
 
     k = 10
 
     # Check that the brute force distance computation is correct
     dists = compute_distances(queries, k, distance_metric, dataset)
     ground = distances[:len(dists), :k]
-    assert np.all(np.abs(dists - ground) < 0.0001)
+    assert np.allclose(dists, ground)
     print("Exact search all OK")
 
     # Check that the approximate distance computation gives a reasonable recall
