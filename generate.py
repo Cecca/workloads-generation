@@ -112,6 +112,9 @@ class RandomWalkEuclidean(RandomWalk):
 
 
 def plot_path(dataset, q, path):
+    from sklearn.decomposition import PCA
+    import matplotlib.pyplot as plt
+
     pca = PCA(2)
     proj = pca.fit_transform(dataset)
     q = pca.transform(q.reshape(1, -1))
@@ -146,39 +149,54 @@ def plot_path(dataset, q, path):
     plt.savefig("zoomed.png")
 
 
-if __name__ == "__main__":
-    from sklearn.decomposition import PCA
-    import matplotlib.pyplot as plt
+def main():
+    import argparse
 
-    dataset_name = "fashion-mnist"
-    dataset, queries, _distances, distance_metric = read_data.read_data(dataset_name, dataset_name)
-    # pca = PCA(2)
-    # dataset = pca.fit_transform(dataset[:50,:])
-    # queries = pca.transform(queries)
-    # dataset /= np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-    # queries /= np.linalg.norm(queries, axis=1)[:, np.newaxis]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', required=True, help='Path to the dataset file')
+    parser.add_argument('--query', required=True, help='Path to the query file')
+    parser.add_argument('--k', type=int, required=True, help='Number of nearest neighbors to find')
+    parser.add_argument('--metric', type=str, required=True, help='Difficult metric')
+    parser.add_argument('--target', type=float, required=True, help='Target difficulty')
+    parser.add_argument('--probes', type=int, required=True, help='Number of probes to use')
+    parser.add_argument('--scale', type=float, required=False, default=10.0, help='Noise scale')
+    parser.add_argument('--max-steps', type=int, required=False, default=100, help='Number of random walk steps (maximum)')
+    parser.add_argument('--data_limit', type=int,  help='Maximum number of data points to load from the dataset file')
+    parser.add_argument('--query_limit', type=int,  help='Maximum number of query points to load from the query file')
+
+
+    args = parser.parse_args()
+
+    dataset_name = args.dataset
+    queryset_name = args.query
+    dataset, queries, _distances, distance_metric = read_data.read_data(dataset_name, queryset_name)
     print("Dataset with shape", dataset.shape)
-    k=10
+    k = args.k
+    metric = args.metric
+    target = args.target
+    probes = args.probes
+    scale = args.scale
+    max_steps = args.max_steps
 
     if distance_metric == "angular":
         walker = RandomWalkAngular(
             dataset,
             k,
-            "logrc",
-            target=0.3,
-            probes=16,
-            scale=10.0,
-            max_steps=400
+            metric,
+            target=target,
+            probes=probes,
+            scale=scale,
+            max_steps=max_steps
         )
     elif distance_metric == "euclidean":
         walker = RandomWalkEuclidean(
             dataset,
             k,
-            "lid",
-            target=200,
-            probes=16,
-            scale=10.0,
-            max_steps=400
+            metric,
+            target=target,
+            probes=probes,
+            scale=scale,
+            max_steps=max_steps
         )
     else:
         raise NotImplementedError("Distance metric not implemented")
@@ -188,3 +206,6 @@ if __name__ == "__main__":
     path = walker.get_path()
     plot_path(dataset, q, path)
 
+
+if __name__ == "__main__":
+    main()
