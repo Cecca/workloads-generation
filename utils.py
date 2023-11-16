@@ -8,7 +8,7 @@ DATASETS = {
 }
 
 
-def compute_distances(query, k, metric, data_or_index):
+def compute_distances(queries, k, metric, data_or_index):
     """
     Compute the k smallest distances from the given query in the
     specified metric space. The last argument can be either:
@@ -24,35 +24,38 @@ def compute_distances(query, k, metric, data_or_index):
 
     If `k` is None, then all distances are returned
     """
-    if len(query.shape) == 2:
-        # We were given multiple queries
-        return np.array([
-            compute_distances(q, k, metric, data_or_index)
-            for q in query
-        ])
+    if len(queries.shape) == 1:
+        # We were given just a single query
+        queries = np.array([queries])
 
     if metric == "angular":
-        assert np.isclose(1.0, np.linalg.norm(query)), f"query should have unit norm, has norm {np.linalg.norm(query)} instead"
+        assert np.all(np.isclose(1.0, np.linalg.norm(queries, axis=1))), f"queries should have unit norm, has norm {np.linalg.norm(query)} instead"
 
     if hasattr(data_or_index, 'shape'):
         dataset = data_or_index
         if metric == "angular":
             assert np.allclose(1.0, np.linalg.norm(dataset, axis=1)), "Data points should have unit norm"
-            dists = 1 - np.dot(dataset, query) 
+            dists = np.array([
+                1 - np.dot(dataset, query)
+                for query in queries
+            ])
         elif metric == "euclidean":
-            dists = np.linalg.norm(query - dataset, axis=1)
+            dists = np.array([
+                np.linalg.norm(query - dataset, axis=1)
+                for query in queries
+            ])
         else:
             raise RuntimeError("unknown distance" + metric)
         if k is not None:
-            dists = np.partition(dists, k)[:k]
+            dists.partition(k, axis=1)
+            dists = dists[:,:k] # np.partition(dists, k)[:k]
         assert np.all(dists >= 0)
         return np.sort(dists)
     else:
         faiss_index = data_or_index
-        qq = np.array([query]) # just to comply with faiss API
         if k is None:
             k = faiss_index.ntotal
-        dists = faiss_index.search(qq, k)[0][0]
+        dists = faiss_index.search(queries, k)[0]
         if metric == "angular":
             # The index returns squared euclidean distances, 
             # which we turn to angular distances in the following
@@ -75,5 +78,6 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
         if d <= t:
             actual += 1
     return float(actual) / float(count)
+
 
 

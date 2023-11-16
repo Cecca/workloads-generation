@@ -150,19 +150,32 @@ if __name__ == "__main__":
     # Here we check that the distance-computing function makes sense.
     import faiss
     from utils import compute_recall
+    import time
 
     dataset_name = "glove-100"
     dataset, queries, distances, distance_metric = read_data(
-        dataset_name, dataset_name, data_limit=10000, query_limit=10)
+        dataset_name, dataset_name, data_limit=None, query_limit=16)
 
     k = 10
 
     # Check that the brute force distance computation is correct
+    start = time.time()
     dists = compute_distances(queries, k, distance_metric, dataset)
+    end = time.time()
     ground = distances[:len(dists), :k]
     assert np.allclose(dists, ground)
-    print("Exact search all OK")
+    print("Exact search all OK:", end - start, "seconds")
 
+    # Check FAISS exact index
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+    start = time.time()
+    dists = compute_distances(queries, k, distance_metric, index)
+    end = time.time()
+    ground = distances[:len(dists), :k]
+    assert np.allclose(dists, ground)
+    print("FAISS exact search all OK:", end - start, "seconds")
+    
     # Check that the approximate distance computation gives a reasonable recall
     n_list = 32
     quantizer = faiss.IndexFlatL2(dataset.shape[1])
@@ -170,10 +183,14 @@ if __name__ == "__main__":
     index.train(dataset)
     index.add(dataset)
     index.nprobe = 32
-    for i, q in enumerate(queries):
-        dists = compute_distances(q, k, distance_metric, index)
-        ground = distances[i,:k]
-        rec = compute_recall(ground, dists, k)
-        assert rec >= 0.95
-    print("Approximate search all OK")
+    start = time.time()
+    dists = compute_distances(queries, k, distance_metric, index)
+    ground = distances[:len(dists), :k]
+    recalls = np.array([
+        compute_recall(g, d, k)
+        for g, d in zip(ground, dists)
+    ])
+    assert np.all(recalls >= 0.95)
+    end = time.time()
+    print("Approximate search all OK:", end - start, "seconds")
 
