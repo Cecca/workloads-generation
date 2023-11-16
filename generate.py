@@ -25,6 +25,7 @@ class RandomWalk(object):
         self.direction_increasing = metric in ["lid", "loglid"]
         self.gen = np.random.default_rng(seed)
         self.path = []
+        self.tested = []
         self.candidate = startquery if startquery is not None else self.generate_random_point()
         self.candidate_metric = dm.compute(self.candidate, self.dataset, self.metric, self.k, distance_metric=distance_metric)
 
@@ -44,6 +45,7 @@ class RandomWalk(object):
         print("Step", self.cnt_steps, "metric", self.candidate_metric)
         self.cnt_steps += 1
         candidates = [self.generate_candidate(self.candidate) for _ in range(self.probes)]
+        self.tested.extend(candidates)
         candidates = [
             (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
             for c in candidates
@@ -69,6 +71,9 @@ class RandomWalk(object):
 
     def get_path(self):
         return np.stack(self.path)
+
+    def get_tested(self):
+        return np.stack(self.tested)
 
 
 class RandomWalkAngular(RandomWalk):
@@ -111,29 +116,30 @@ class RandomWalkEuclidean(RandomWalk):
         return query
 
 
-def plot_path(dataset, q, path):
+def plot_path(dataset, q, path, tested):
     from sklearn.decomposition import PCA
     import matplotlib.pyplot as plt
 
     pca = PCA(2)
     proj = pca.fit_transform(dataset)
     q = pca.transform(q.reshape(1, -1))
-    print(q)
     path = pca.transform(path)
-    print(path)
+    tested = pca.transform(tested)
 
     plt.figure(figsize=(10,10))
-    plt.scatter(proj[:,0], proj[:,1], s=1)
-    plt.plot(path[:,0], path[:,1], c="orange")
-    plt.scatter(path[:,0], path[:,1], c="orange")
-    plt.scatter(q[:,0], q[:,1], s=10, c="red")
+    plt.scatter(proj[:,0], proj[:,1], s=1, zorder=0)
+    plt.scatter(q[:,0], q[:,1], s=20, c="red", zorder=10)
+    plt.scatter(path[:,0], path[:,1], c="orange", zorder=3)
+    plt.scatter(tested[:,0], tested[:,1], c="yellow", s=2, zorder=2)
+    plt.plot(path[:,0], path[:,1], c="orange", zorder=1)
     plt.savefig("generated.png")
 
     plt.figure(figsize=(10,10))
-    plt.scatter(proj[:,0], proj[:,1], s=1)
-    plt.plot(path[:,0], path[:,1], c="orange")
-    plt.scatter(path[:,0], path[:,1], c="orange")
-    plt.scatter(q[:,0], q[:,1], s=10, c="red")
+    plt.scatter(proj[:,0], proj[:,1], s=1, zorder=0)
+    plt.scatter(q[:,0], q[:,1], s=20, c="red", zorder=10, edgecolors="black")
+    plt.scatter(path[:,0], path[:,1], c="orange", zorder=3, edgecolors="black")
+    plt.scatter(tested[:,0], tested[:,1], c="yellow", zorder=2, edgecolors="black")
+    plt.plot(path[:,0], path[:,1], c="orange", zorder=1)
     scale = 4
     xmin = path[:,0].min()
     ymin = path[:,1].min()
@@ -163,13 +169,14 @@ def main():
     parser.add_argument('--max-steps', type=int, required=False, default=100, help='Number of random walk steps (maximum)')
     parser.add_argument('--data_limit', type=int,  help='Maximum number of data points to load from the dataset file')
     parser.add_argument('--query_limit', type=int,  help='Maximum number of query points to load from the query file')
+    parser.add_argument('--start-from-datapoint', type=int,  help='Datapoint from which to make the search start')
 
 
     args = parser.parse_args()
 
     dataset_name = args.dataset
     queryset_name = args.query
-    dataset, queries, _distances, distance_metric = read_data.read_data(dataset_name, queryset_name)
+    dataset, _queries, _distances, distance_metric = read_data.read_data(dataset_name, queryset_name)
     print("Dataset with shape", dataset.shape)
     k = args.k
     metric = args.metric
@@ -177,34 +184,32 @@ def main():
     probes = args.probes
     scale = args.scale
     max_steps = args.max_steps
+    if args.start_from_datapoint is not None:
+        starting = dataset[args.start_from_datapoint,:]
+    else:
+        starting = None
 
     if distance_metric == "angular":
-        walker = RandomWalkAngular(
-            dataset,
-            k,
-            metric,
-            target=target,
-            probes=probes,
-            scale=scale,
-            max_steps=max_steps
-        )
+        walker_class = RandomWalkAngular
     elif distance_metric == "euclidean":
-        walker = RandomWalkEuclidean(
-            dataset,
-            k,
-            metric,
-            target=target,
-            probes=probes,
-            scale=scale,
-            max_steps=max_steps
-        )
+        walker_class = RandomWalkEuclidean
     else:
         raise NotImplementedError("Distance metric not implemented")
 
+    walker = walker_class(
+        dataset,
+        k,
+        metric,
+        target=target,
+        probes=probes,
+        scale=scale,
+        max_steps=max_steps,
+        startquery = starting
+    )
+
     qm, q = walker.run()
     print("Generated query with metric", qm)
-    path = walker.get_path()
-    plot_path(dataset, q, path)
+    plot_path(dataset, q, walker.get_path(), walker.get_tested())
 
 
 if __name__ == "__main__":
