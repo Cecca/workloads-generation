@@ -4,122 +4,116 @@ This module collects approaches to generate workloads for a given dataset.
 
 import numpy as np
 import dimensionality_measures as dm
+import read_data
 
 
-def gen_random_walk(dataset, k, metric, target, probes=4, scale=1.0,
-                    max_steps=100, seed=1234, startquery=None, distance_metric="angular"):
-    dim = dataset.shape[1]
+class RandomWalk(object):
+    def __init__(self, dataset, k, metric, target, probes=4, scale=1.0,
+                 max_steps=100, seed=1234, startquery=None, distance_metric="angular"):
+        self.dataset = dataset
+        self.k = k
+        self.metric = metric
+        self.target = target
+        self.probes = probes
+        self.scale = scale
+        self.cnt_steps = 0
+        self.max_steps = max_steps
+        self.seed = seed
+        self.distance_metric = distance_metric
+        self.dim = dataset.shape[1]
+        # whether the direction of "harder" queries is increasing, metric-wise
+        self.direction_increasing = metric in ["lid", "loglid"]
+        self.gen = np.random.default_rng(seed)
+        self.path = []
+        self.candidate = startquery if startquery is not None else self.generate_random_point()
+        self.candidate_metric = dm.compute(self.candidate, self.dataset, self.metric, self.k, distance_metric=distance_metric)
 
-    def gen_query_angular(base, gen):
-        if base is None:
-            query = gen.normal(size=dim)
+    def harder_than(self, candidate_metric, target):
+        if self.direction_increasing:
+            return candidate_metric > target
         else:
-            rotation = gen.normal(scale=scale, size=(dim, dim))
-            query = np.dot(base, rotation)
+            return candidate_metric < target
+
+    def generate_random_point(self):
+        raise NotImplementedError()
+
+    def generate_candidate(self, base):
+        raise NotImplementedError()
+
+    def move_next(self):
+        print("Step", self.cnt_steps, "metric", self.candidate_metric)
+        self.cnt_steps += 1
+        candidates = [self.generate_candidate(self.candidate) for _ in range(self.probes)]
+        candidates = [
+            (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
+            for c in candidates
+        ]
+        candidates = sorted(candidates, reverse=self.direction_increasing)
+
+        # pick the candidate with the best metric, if it is better than the
+        # current best candidate
+        new_metric, new_candidate = candidates[0]
+        if self.harder_than(new_metric, self.candidate_metric):
+            self.candidate_metric = new_metric
+            self.candidate = new_candidate
+            self.path.append(new_candidate)
+
+    def is_done(self):
+        return self.harder_than(self.candidate_metric, self.target) or self.cnt_steps >= self.max_steps
+
+    
+    def run(self):
+        while not self.is_done():
+            self.move_next()
+        return self.candidate_metric, self.candidate
+
+    def get_path(self):
+        return np.stack(self.path)
+
+
+class RandomWalkAngular(RandomWalk):
+    def __init__(self, dataset, k, metric, target, probes=4, scale=1, max_steps=100, seed=1234, startquery=None):
+        super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="angular")
+
+    def generate_random_point(self):
+        query = self.gen.normal(size=self.dim)
         query /= np.linalg.norm(query)
-        assert query.shape[0] == dataset.shape[1]
-        query_metric = dm.compute(query, dataset, metric, k, distance_metric="angular")
-        return query_metric, query
+        return query
 
-    def gen_query_euclidean(base, gen):
-        if base is None:
-            mins = np.min(dataset, axis=0)
-            maxs = np.max(dataset, axis=0)
-            assert mins.shape[0] == dataset.shape[1]
-            # offset = np.array([gen.normal(scale=(maxs[i] - mins[i])/3) for i in range(dataset.shape[1])])
-            # query = np.mean(dataset, axis=0) + offset #gen.normal(size=dim, scale=scale)
-            query = gen.uniform(mins, maxs)
-        else:
-            offset = gen.normal(scale=scale, size=dim)
-            query = base + offset
-        assert query.shape[0] == dataset.shape[1]
-        query_metric = dm.compute(query, dataset, metric, k, distance_metric="euclidean")
-        return query_metric, query
-
-    genfunc_dict = {
-        "angular": gen_query_angular,
-        "euclidean": gen_query_euclidean
-    }
-    genfunc = genfunc_dict[distance_metric]
-
-    # comparator that sets the direction of harder queries, for the given metric
-    harder_than_cmp = {
-        "lid": "__gt__",
-        "loglid": "__gt__",
-        "rc": "__lt__",
-        "logrc": "__lt__",
-        "expansion": "__lt__",
-        "logexpansion": "__lt__"
-    }
-    should_reverse = {
-        "lid": False,
-        "loglid": False,
-        "rc": True,
-        "logrc": True,
-        "expansion": True,
-        "logexpansion": True
-    }
-    def harder_than(m, ref):
-        return getattr(m, harder_than_cmp[metric])(ref)
-
-    gen = np.random.default_rng(seed)
-    if startquery is None:
-        query_metric, query = genfunc(None, gen)
-    else:
-        query_metric = dm.compute(startquery, dataset, metric, k, distance_metric=distance_metric)
-        query = startquery
-
-    path = [query]
-
-    for step in range(max_steps):
-        print("step", step, metric, "=", query_metric)
-        candidates = [genfunc(query, gen) for _ in range(probes)]
-        candidates = sorted(candidates, reverse=should_reverse[metric])
-        for candidate_metric, candidate in candidates:
-            if harder_than(candidate_metric, target):
-                path.append(candidate)
-                path = np.stack(path)
-                assert path.shape[1] == dataset.shape[1]
-                return candidate_metric, candidate, path
-
-        # if we did not return, pick the candidate with the 
-        # best metric, if it is better than the current best query
-        candidate_metric, candidate = candidates[-1]
-        if harder_than(candidate_metric, query_metric):
-            query = candidate
-            query_metric = candidate_metric
-            path.append(query)
-    print("Failed to find candidate query")
+    def generate_candidate(self, base):
+        coord = self.gen.integers(self.dim)
+        next_coord = (coord+1) % self.dim
+        rotation = np.identity(self.dim)
+        angle = self.gen.normal(scale=self.scale)
+        rotation[coord, coord] = np.cos(angle)
+        rotation[next_coord, next_coord] = np.cos(angle)
+        rotation[coord, next_coord] = -np.sin(angle)
+        rotation[next_coord, coord] = np.sin(angle)
+        query = np.dot(base, rotation)
+        query /= np.linalg.norm(query)
+        return query
 
 
-if __name__ == "__main__":
-    import bench
-    from sklearn.decomposition import PCA
-    import matplotlib.pyplot as plt
-    # from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-    # from mpl_toolkits.axes_grid1.inset_locator import mark_inset, zoomed_inset_axes
+class RandomWalkEuclidean(RandomWalk):
+    def __init__(self, dataset, k, metric, target, probes=4, scale=1, max_steps=100, seed=1234, startquery=None):
+        super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="euclidean")
 
-    dataset, queries, distances, distance_metric = bench.load_dataset("fashion-mnist")
-    # dataset = PCA(2).fit_transform(dataset)
-    k=10
+    def generate_random_point(self):
+        mins = np.min(self.dataset, axis=0)
+        maxs = np.max(self.dataset, axis=0)
+        assert mins.shape[0] == self.dataset.shape[1]
+        query = self.gen.uniform(mins, maxs)
+        return query
 
+    def generate_candidate(self, base):
+        offset = self.gen.normal(scale=self.scale, size=self.dim)
+        query = base + offset
+        return query
+
+
+def plot_path(dataset, q, path):
     pca = PCA(2)
     proj = pca.fit_transform(dataset)
-
-    # loglid is the one that seems to be working the best, but why?
-    qm, q, path = gen_random_walk(
-        dataset,
-        k,
-        "lid",
-        distance_metric=distance_metric,
-        target=200, # possibly, the LID should be related to the actual dimensionality of the dataset
-        probes=2**4,
-        scale=10,
-        max_steps=200,
-        seed=None,
-        startquery=None #queries[9533]
-    )
-    print("Generated query with metric", qm)
     q = pca.transform(q.reshape(1, -1))
     print(q)
     path = pca.transform(path)
@@ -151,4 +145,46 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig("zoomed.png")
 
+
+if __name__ == "__main__":
+    from sklearn.decomposition import PCA
+    import matplotlib.pyplot as plt
+
+    dataset_name = "fashion-mnist"
+    dataset, queries, _distances, distance_metric = read_data.read_data(dataset_name, dataset_name)
+    # pca = PCA(2)
+    # dataset = pca.fit_transform(dataset[:50,:])
+    # queries = pca.transform(queries)
+    # dataset /= np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+    # queries /= np.linalg.norm(queries, axis=1)[:, np.newaxis]
+    print("Dataset with shape", dataset.shape)
+    k=10
+
+    if distance_metric == "angular":
+        walker = RandomWalkAngular(
+            dataset,
+            k,
+            "logrc",
+            target=0.3,
+            probes=16,
+            scale=10.0,
+            max_steps=400
+        )
+    elif distance_metric == "euclidean":
+        walker = RandomWalkEuclidean(
+            dataset,
+            k,
+            "lid",
+            target=200,
+            probes=16,
+            scale=10.0,
+            max_steps=400
+        )
+    else:
+        raise NotImplementedError("Distance metric not implemented")
+
+    qm, q = walker.run()
+    print("Generated query with metric", qm)
+    path = walker.get_path()
+    plot_path(dataset, q, path)
 

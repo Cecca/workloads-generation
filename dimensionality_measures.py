@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import utils
 
 
 def compute_lid(distances, k, scale="log"):
@@ -40,12 +41,9 @@ def compute_expansion(distances, k, scale="log"):
         return distances[2*k] / distances[k]
 
 def compute(query, dataset, metric, k, distance_metric="euclidean"):
+    assert k >= 1
     assert len(query) == dataset.shape[1], f"Query shape {len(query)}, dataset dimensions {dataset.shape[1]}"
-    if distance_metric == "euclidean":
-        distances = np.linalg.norm(query - dataset, axis=1)
-    else:
-        distances = 1 - np.dot(dataset, query)
-    np.ndarray.sort(distances)
+    distances = utils.compute_distances(query, None, distance_metric, dataset)
     assert (distances >= 0).all()
     if metric == "lid":
         return compute_lid(distances, k, scale="linear")
@@ -65,14 +63,7 @@ def compute(query, dataset, metric, k, distance_metric="euclidean"):
 def compute_metrics(query, dataset, k, scale="log", distance_metric="euclidean"):
     assert query.shape[0] == dataset.shape[1], "data and query are expected to have the same dimension"
 
-    if distance_metric == "euclidean":
-        distances = np.linalg.norm(query - dataset, axis=1)
-    elif distance_metric == "angular":
-        distances = 1 - np.dot(dataset, query)
-    else:
-        raise Exception("unknown distance metric")
-    np.ndarray.sort(distances)
-
+    distances = utils.compute_distances(query, k, distance_metric, dataset)
     lid = compute_lid(distances, k, scale)
     rc = compute_rc(distances, k, scale)
     expansion = compute_expansion(distances, k, scale)
