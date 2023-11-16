@@ -1,3 +1,4 @@
+*.png
 *.hdf5
 ans.csv
 __pycache__

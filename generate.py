@@ -2,6 +2,7 @@
 This module collects approaches to generate workloads for a given dataset.
 """
 
+from os import write
 import numpy as np
 import dimensionality_measures as dm
 import read_data
@@ -157,6 +158,7 @@ def plot_path(dataset, q, path, tested):
 
 def main():
     import argparse
+    import os
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=True, help='Path to the dataset file')
@@ -170,6 +172,8 @@ def main():
     parser.add_argument('--data_limit', type=int,  help='Maximum number of data points to load from the dataset file')
     parser.add_argument('--query_limit', type=int,  help='Maximum number of query points to load from the query file')
     parser.add_argument('--start-from-datapoint', type=int,  help='Datapoint from which to make the search start')
+    parser.add_argument('--num-queries', type=int,  help='Number of queries to generate')
+    parser.add_argument('--queries-output', type=str,  help='Path to queries output file')
 
 
     args = parser.parse_args()
@@ -196,20 +200,53 @@ def main():
     else:
         raise NotImplementedError("Distance metric not implemented")
 
-    walker = walker_class(
-        dataset,
-        k,
-        metric,
-        target=target,
-        probes=probes,
-        scale=scale,
-        max_steps=max_steps,
-        startquery = starting
-    )
+    if args.num_queries is None:
+        walker = walker_class(
+            dataset,
+            k,
+            metric,
+            target=target,
+            probes=probes,
+            scale=scale,
+            max_steps=max_steps,
+            startquery = starting
+        )
 
-    qm, q = walker.run()
-    print("Generated query with metric", qm)
-    plot_path(dataset, q, walker.get_path(), walker.get_tested())
+        qm, q = walker.run()
+        print("Generated query with metric", qm)
+        plot_path(dataset, q, walker.get_path(), walker.get_tested())
+    else:
+        assert args.queries_output is not None
+        if os.path.isfile(args.queries_output):
+            exit(f"File {args.queries_output} already exists, provide another one")
+        gen = np.random.default_rng(1234)
+        starting_ids = gen.choice(np.arange(dataset.shape[0]), size=args.num_queries, replace=False)
+        queries = []
+        for idx in starting_ids:
+            print("Starting from point", idx)
+            starting = dataset[idx,:]
+            walker = walker_class(
+                dataset,
+                k,
+                metric,
+                target=target,
+                probes=probes,
+                scale=scale,
+                max_steps=max_steps,
+                startquery = starting
+            )
+            qm, q = walker.run()
+            print("Generated query with metric", qm)
+            queries.append(q)
+        queries = np.stack(queries)
+        write_queries_hdf5(queries, args.queries_output)
+
+
+
+def write_queries_hdf5(queries, path):
+    import h5py
+    with h5py.File(path, "w") as hfp:
+        hfp['test'] = queries
 
 
 if __name__ == "__main__":
