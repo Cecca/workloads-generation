@@ -7,38 +7,8 @@ import time
 from tqdm import tqdm
 import requests
 import dimensionality_measures as dm
+from utils import *
 
-DATASETS = {
-    "fashion-mnist": ".fashion-mnist-784-euclidean.hdf5",
-    "mnist": ".mnist-784-euclidean.hdf5",
-    "glove-100": ".glove-100-angular.hdf5",
-    "glove-25": ".glove-25-angular.hdf5"
-}
-
-def load_dataset(name, nqueries = None):
-    data_file = DATASETS[name]
-    url = f"http://ann-benchmarks.com/{data_file[1:]}"
-    if not os.path.isfile(data_file):
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(data_file, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192): 
-                    f.write(chunk)
-
-    with h5py.File(data_file) as hfp:
-        dataset = hfp['train'][:]
-        if nqueries is not None:
-            queries = hfp['test'][:nqueries]
-        else:
-            queries = hfp['test'][:]
-        distances = hfp['distances'][:]
-        distance_metric = hfp.attrs['distance']
-    print("metric for dataset", name, "is", distance_metric)
-
-    if distance_metric == "angular":
-        dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-        queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-    return dataset, queries, distances, distance_metric
 
 
 def compute_recall(dataset_distances, run_distances, count, epsilon=1e-3):
