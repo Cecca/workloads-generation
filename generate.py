@@ -82,14 +82,14 @@ class RandomWalkAngular(RandomWalk):
         super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="angular")
 
     def generate_random_point(self):
-        query = self.gen.normal(size=self.dim)
+        query = self.gen.normal(size=self.dim, dtype=np.float32)
         query /= np.linalg.norm(query)
         return query
 
     def generate_candidate(self, base):
         coord = self.gen.integers(self.dim)
         next_coord = (coord+1) % self.dim
-        rotation = np.identity(self.dim)
+        rotation = np.identity(self.dim, dtype=np.float32)
         angle = self.gen.normal(scale=self.scale)
         rotation[coord, coord] = np.cos(angle)
         rotation[next_coord, next_coord] = np.cos(angle)
@@ -108,7 +108,7 @@ class RandomWalkEuclidean(RandomWalk):
         mins = np.min(self.dataset, axis=0)
         maxs = np.max(self.dataset, axis=0)
         assert mins.shape[0] == self.dataset.shape[1]
-        query = self.gen.uniform(mins, maxs)
+        query = self.gen.uniform(mins, maxs, dtype=np.float32)
         return query
 
     def generate_candidate(self, base):

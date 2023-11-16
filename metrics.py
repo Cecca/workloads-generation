@@ -1,5 +1,7 @@
 import sys
 import argparse
+
+import h5py
 import numpy as np
 from tqdm import tqdm
 import csv
@@ -110,6 +112,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     dataset, queries, distances, distance_metric = rd.read_data(dataset_name, queryset_name, data_limit, query_limit)
+    print("Loaded dataset with {} points, and queryset with {} queries".format(dataset.shape, queries.shape))
 
     epsilons = None
 
@@ -134,6 +137,7 @@ if __name__ == "__main__":
 
         header = ["i", "lid_"+str(k_value), "rc_"+str(k_value), f"exp_{2*k_value}|{k_value}"]
         header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
+        header.extend(["distcomp", "recall", "elapsed"])
         writer.writerow(header)
 
         nqueries = queries.shape[0]
@@ -165,7 +169,6 @@ if __name__ == "__main__":
                     flag = False
 
                 rec = compute_recall(q_dists, run_dists, k_value)
-                # print(rec)
                 if rec >= target_recall:
                     distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
                     break
