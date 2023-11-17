@@ -2,16 +2,20 @@
 This module collects approaches to generate workloads for a given dataset.
 """
 
-from os import write
 import numpy as np
 import dimensionality_measures as dm
 import read_data
+import faiss
+import utils
+import time
 
 
 class RandomWalk(object):
     def __init__(self, dataset, k, metric, target, probes=4, scale=1.0,
                  max_steps=100, seed=1234, startquery=None, distance_metric="angular"):
         self.dataset = dataset
+        self.index = faiss.IndexFlatL2(dataset.shape[1])
+        self.index.add(dataset)
         self.k = k
         self.metric = metric
         self.target = target
@@ -23,12 +27,21 @@ class RandomWalk(object):
         self.distance_metric = distance_metric
         self.dim = dataset.shape[1]
         # whether the direction of "harder" queries is increasing, metric-wise
+        if "lid" == metric:
+            self.compute_metric = lambda dists, k: dm.compute_lid(dists, k, "linear")
+        elif "rc" == metric:
+            self.compute_metric = lambda dists, k: dm.compute_rc(dists, k, "linear")
+        elif "expansion" == metric:
+            self.compute_metric = lambda dists, k: dm.compute_expansion(dists, k, "linear")
+        else:
+            raise Exception("Unknown metric %s" % metric)
         self.direction_increasing = metric in ["lid", "loglid"]
         self.gen = np.random.default_rng(seed)
         self.path = []
         self.tested = []
-        self.candidate = startquery if startquery is not None else self.generate_random_point()
-        self.candidate_metric = dm.compute(self.candidate, self.dataset, self.metric, self.k, distance_metric=distance_metric)
+        self.candidate = startquery if startquery is not None else self.generate_random_point().astype(np.float32)
+        candidate_distances = utils.compute_distances(self.candidate, None, self.distance_metric, self.index)[0,:]
+        self.candidate_metric = self.compute_metric(candidate_distances, self.k)
 
     def harder_than(self, candidate_metric, target):
         if self.direction_increasing:
@@ -45,11 +58,23 @@ class RandomWalk(object):
     def move_next(self):
         print("Step", self.cnt_steps, "metric", self.candidate_metric)
         self.cnt_steps += 1
-        candidates = [self.generate_candidate(self.candidate) for _ in range(self.probes)]
-        self.tested.extend(candidates)
+        start = time.time()
         candidates = [
-            (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
-            for c in candidates
+            self.generate_candidate(self.candidate).astype(np.float32) 
+            for _ in range(self.probes)
+        ]
+        end = time.time()
+        print("time to generate candidates", end - start, "seconds")
+        self.tested.extend(candidates)
+        candidates = np.array(candidates)
+        start = time.time()
+        candidate_distances = utils.compute_distances(candidates, None, self.distance_metric, self.index)
+        end = time.time()
+        print("Time to compute distances", end - start, "seconds")
+        candidates = [
+            # (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
+            ( self.compute_metric(dists, self.k) , c)
+            for c, dists in zip(candidates, candidate_distances)
         ]
         candidates = sorted(candidates, reverse=self.direction_increasing)
 
@@ -82,14 +107,14 @@ class RandomWalkAngular(RandomWalk):
         super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="angular")
 
     def generate_random_point(self):
-        query = self.gen.normal(size=self.dim, dtype=np.float32)
+        query = self.gen.normal(size=self.dim)
         query /= np.linalg.norm(query)
         return query
 
     def generate_candidate(self, base):
         coord = self.gen.integers(self.dim)
         next_coord = (coord+1) % self.dim
-        rotation = np.identity(self.dim, dtype=np.float32)
+        rotation = np.identity(self.dim)
         angle = self.gen.normal(scale=self.scale)
         rotation[coord, coord] = np.cos(angle)
         rotation[next_coord, next_coord] = np.cos(angle)
@@ -108,7 +133,7 @@ class RandomWalkEuclidean(RandomWalk):
         mins = np.min(self.dataset, axis=0)
         maxs = np.max(self.dataset, axis=0)
         assert mins.shape[0] == self.dataset.shape[1]
-        query = self.gen.uniform(mins, maxs, dtype=np.float32)
+        query = self.gen.uniform(mins, maxs)
         return query
 
     def generate_candidate(self, base):

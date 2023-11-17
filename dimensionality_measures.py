@@ -6,6 +6,7 @@ import utils
 
 
 def compute_lid(distances, k, scale="log"):
+    assert len(distances.shape) == 1
     assert len(distances) >= k
     w = distances[min(len(distances) - 1, k)]
     half_w = 0.5 * w

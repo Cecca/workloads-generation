@@ -24,7 +24,8 @@ def compute_distances(queries, k, metric, data_or_index):
 
     If `k` is None, then all distances are returned
     """
-    if len(queries.shape) == 1:
+    single_query_input = len(queries.shape) == 1
+    if single_query_input:
         # We were given just a single query
         queries = np.array([queries])
 
