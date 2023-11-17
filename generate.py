@@ -56,6 +56,7 @@ class RandomWalk(object):
         raise NotImplementedError()
 
     def move_next(self):
+        step_start = time.time()
         print("Step", self.cnt_steps, "metric", self.candidate_metric)
         self.cnt_steps += 1
         start = time.time()
@@ -64,13 +65,13 @@ class RandomWalk(object):
             for _ in range(self.probes)
         ]
         end = time.time()
-        print("time to generate candidates", end - start, "seconds")
+        print("   time to generate candidates", end - start, "seconds")
         self.tested.extend(candidates)
         candidates = np.array(candidates)
         start = time.time()
         candidate_distances = utils.compute_distances(candidates, None, self.distance_metric, self.index)
         end = time.time()
-        print("Time to compute distances", end - start, "seconds")
+        print("   Time to compute distances", end - start, "seconds")
         candidates = [
             # (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
             ( self.compute_metric(dists, self.k) , c)
@@ -85,6 +86,8 @@ class RandomWalk(object):
             self.candidate_metric = new_metric
             self.candidate = new_candidate
             self.path.append(new_candidate)
+        step_end = time.time()
+        print("Step time", step_end - step_start, "seconds")
 
     def is_done(self):
         return self.harder_than(self.candidate_metric, self.target) or self.cnt_steps >= self.max_steps
