@@ -115,7 +115,8 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)
         
         distance_metric = "euclidean"
-        distances = compute_distances(queries, 100, distance_metric, dataset)
+        # distances = compute_distances(queries, 100, distance_metric, dataset)
+        distances = None
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit()
