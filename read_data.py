@@ -3,6 +3,7 @@ import os
 import numpy as np
 import requests
 from utils import compute_distances
+import sys
 
 dataset_path="/data/qwang/datasets/"
 noise_q_path="/mnt/hddhelp/ts_benchmarks/datasets/workloads_karima/sald/"
@@ -40,33 +41,61 @@ WORKLOADS = {
 "glove-25": "glove-25-angular.hdf5",
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
-"sift": "sift-128-euclidean.hdf5"
+"sift": "sift-128-euclidean.hdf5",
+"sift-lid20": "sift-lid20.hdf5",
+"sift-lid50": "sift-lid50.hdf5",
+"sift-lid100": "sift-lid100.hdf5",
+"sift-lid400": "sift-lid400.hdf5"
 }
 
-def read_from_hdf5(filename, data_limit=None, query_limit=None):
+
+def _download_ann_benchmarks(data_path):
+    """Downloads a dataset from ann-benchmarks.com"""
+    url = f"http://ann-benchmarks.com/{data_path}"
+    if not os.path.isfile(data_path):
+        print("Downloading from", url)
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(data_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192): 
+                    f.write(chunk)
+
+
+def read_hdf5(filename, what, limit=None):
     with h5py.File(filename) as hfp:
-        distance_metric = hfp.attrs['distance']
-
-        if query_limit is not None:
-            queries = hfp['test'][:query_limit]
+        distance_metric = hfp.attrs.get('distance', None)
+        if limit is not None:
+            data = hfp[what][:limit]
         else:
-            queries = hfp['test'][:]
+            data = hfp[what][:]
+    return data, distance_metric
 
-        if data_limit is not None:
-            dataset = hfp['train'][:data_limit]
-            # We have to recompute the distances, because the `distances`
-            # matrix stored in the hdf5 file is relative to the _entire_
-            # dataset, not parts of it
-            print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
-            if distance_metric == "angular":
-                dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-                queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-            distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
-        else:
-            dataset = hfp['train'][:]
-            distances = hfp['distances'][:]
 
-    return dataset, queries, distances, distance_metric
+
+# def read_from_hdf5(filename, data_limit=None, query_limit=None):
+#     with h5py.File(filename) as hfp:
+#         distance_metric = hfp.attrs['distance']
+#
+#         if query_limit is not None:
+#             queries = hfp['test'][:query_limit]
+#         else:
+#             queries = hfp['test'][:]
+#
+#         if data_limit is not None:
+#             dataset = hfp['train'][:data_limit]
+#             # We have to recompute the distances, because the `distances`
+#             # matrix stored in the hdf5 file is relative to the _entire_
+#             # dataset, not parts of it
+#             print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
+#             if distance_metric == "angular":
+#                 dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+#                 queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
+#             distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
+#         else:
+#             dataset = hfp['train'][:]
+#             distances = hfp['distances'][:]
+#
+#     return dataset, queries, distances, distance_metric
 
 def read_from_txt(filename):
     data = np.loadtxt(filename)
@@ -90,14 +119,23 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         distance_metric = "euclidean"
         distances = compute_distances(queries, 100, distance_metric, dataset)
     elif data_path.endswith('.hdf5'):
-        url = f"http://ann-benchmarks.com/{data_path}"
-        if not os.path.isfile(data_path):
-            with requests.get(url, stream=True) as r:
-                r.raise_for_status()
-                with open(data_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192): 
-                        f.write(chunk)
-        dataset, queries, distances, distance_metric = read_from_hdf5(data_path, data_limit, query_limit)
+        _download_ann_benchmarks(data_path)
+        _download_ann_benchmarks(query_path)
+        dataset, distance_metric = read_hdf5(data_path, "train", data_limit)
+        queries, _ = read_hdf5(query_path, "test", query_limit)
+        if data_limit is not None or data_path != query_path:
+            # We have to recompute the distances, because the `distances`
+            # matrix stored in the hdf5 file is relative to the _entire_
+            # dataset, not parts of it
+            print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
+            if distance_metric == "angular":
+                dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
+                queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
+            distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ?
+        else:
+            print("data_path", data_path)
+            print("query_path", query_path)
+            distances, _ = read_hdf5(data_path, "distances", query_limit)
     elif data_path.endswith('.bin'):
         data_samples, data_features = parse_filename(data_path)
         query_samples, query_features = parse_filename(query_path)
