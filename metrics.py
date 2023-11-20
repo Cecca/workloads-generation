@@ -64,11 +64,20 @@ def read_sys_argv_list(start_index=4):
         return None
 
 def get_epsilons(queries, dataset, distance_metric):
-    max_dist_arr = [compute_distances(qq, None, distance_metric, dataset)[-1] for qq in queries]
-    print(max_dist_arr)
-    mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
+    # max_dist_arr = [compute_distances(qq, None, distance_metric, dataset)[-1] for qq in queries]
+    # # print(max_dist_arr)
+    # mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
-    return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
+    max_e_arr = []
+    for qq in queries:
+        dist = compute_distances(qq, None, distance_metric, dataset)
+        max_e = dist[-1]/dist[0]-1
+        max_e_arr.append(max_e)
+    mean_max_e = sum(max_e_arr)/len(max_e_arr)
+    print(mean_max_e)
+
+    # return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
+    return [mean_max_e*r for r in[0.25, 0.5, 0.75]]
 
 def build_index(dataset, n_list, distance_metric):
     print("Building index")
@@ -134,6 +143,7 @@ if __name__ == "__main__":
 
         header = ["i", "lid_"+str(k_value), "rc_"+str(k_value), f"exp_{2*k_value}|{k_value}"]
         header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
+        header.extend(['distcomp','rec', 'elapsed'])
         writer.writerow(header)
 
         nqueries = queries.shape[0]
@@ -158,7 +168,7 @@ if __name__ == "__main__":
                 if distances is not None:
                     q_dists =  distances[i,:]
                 else:
-                    q_dists = q_distances
+                    q_dists = q_distances[:100]
                 #debug    
                 if flag:
                     print(f"run_dist: {run_dists} \n q_dist {q_dists}")
