@@ -45,7 +45,13 @@ WORKLOADS = {
 "sift-lid20": "sift-lid20.hdf5",
 "sift-lid50": "sift-lid50.hdf5",
 "sift-lid100": "sift-lid100.hdf5",
-"sift-lid400": "sift-lid400.hdf5"
+"sift-lid400": "sift-lid400.hdf5",
+"sift-rc2": "sift-rc2.hdf5",
+"sift-rc1.4": "sift-rc1.4.hdf5",
+"sift-rc1.1": "sift-rc1.1.hdf5",
+"sift-rc1.04": "sift-rc1.04.hdf5",
+"sift-rc1.02": "sift-rc1.02.hdf5",
+"sift-rc3": "sift-rc3.hdf5",
 }
 
 

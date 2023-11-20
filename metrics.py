@@ -1,7 +1,6 @@
 import sys
 import argparse
 
-import h5py
 import numpy as np
 from tqdm import tqdm
 import csv
@@ -67,7 +66,6 @@ def read_sys_argv_list(start_index=4):
 
 def get_epsilons(queries, dataset, distance_metric):
     max_dist_arr = [compute_distances(qq, None, distance_metric, dataset)[-1] for qq in queries]
-    print(max_dist_arr)
     mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
 
     return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
@@ -114,18 +112,18 @@ if __name__ == "__main__":
     dataset, queries, distances, distance_metric = rd.read_data(dataset_name, queryset_name, data_limit, query_limit)
     print("Loaded dataset with {} points, and queryset with {} queries".format(dataset.shape, queries.shape))
 
-    epsilons = None
-
-    if epsilon is not None:
-        epsilons = [float(x) for x in opt_params]
-    else: 
-        epsilons = get_epsilons(queries[:int(sample*len(queries))+1], dataset, distance_metric)
-
-    epsilons_str = '_'.join(f'{e:.2f}' for e in epsilons)
-    print (f'e-values (based on {sample} query sample): {epsilons_str}')
-
+    # epsilons = None
+    #
+    # if epsilon is not None:
+    #     epsilons = [float(x) for x in opt_params]
+    # else:
+    #     epsilons = get_epsilons(queries[:int(sample*len(queries))+1], dataset, distance_metric)
+    #
+    # print(epsilons)
+    # epsilons_str = '_'.join(f'{e:.2f}' for e in epsilons)
+    # print (f'e-values (based on {sample} query sample): {epsilons_str}')
  
-    output_file = f"res_{dataset_name}_{queryset_name}_{k_value}_{epsilons_str}"
+    output_file = f"res_{dataset_name}_{queryset_name}_{k_value}"
     
     target_recall = 0.95
     n_list = 32
@@ -136,18 +134,21 @@ if __name__ == "__main__":
         writer = csv.writer(fp)
 
         header = ["i", "lid_"+str(k_value), "rc_"+str(k_value), f"exp_{2*k_value}|{k_value}"]
-        header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
+        # header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
         header.extend(["distcomp", "recall", "elapsed"])
         writer.writerow(header)
 
         nqueries = queries.shape[0]
         for i in tqdm(range(nqueries)):
-            query = queries[i,:]  
-            q_distances = compute_distances(query, None, distance_metric, dataset)
-            lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
+            query = queries[i,:].astype(np.float32)
+            q_distances = compute_distances(query, None, distance_metric, dataset)[0]
+            # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
+            lid = compute_lid(q_distances, k_value, "linear")
+            rc = compute_rc(q_distances, k_value, "linear")
+            expansion = compute_expansion(q_distances, k_value, "linear")
             
             row = [i, lid, rc, expansion]
-            row.extend(epsilons_hard)
+            # row.extend(epsilons_hard)
 
             # qq = np.array([query]) # just to comply with faiss API
             distcomp = None
@@ -156,7 +157,7 @@ if __name__ == "__main__":
                 faiss.cvar.indexIVF_stats.reset()
                 index.nprobe = nprobe
                 tstart = time.time()
-                run_dists = compute_distances(query, k_value, distance_metric, index)
+                run_dists = compute_distances(query, k_value, distance_metric, index)[0]
                 tend = time.time()
                 elapsed = tend - tstart
                 if distances is not None:

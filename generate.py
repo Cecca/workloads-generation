@@ -77,7 +77,7 @@ class RandomWalk(object):
             ( self.compute_metric(dists, self.k) , c)
             for c, dists in zip(candidates, candidate_distances)
         ]
-        candidates = sorted(candidates, reverse=self.direction_increasing)
+        candidates = sorted(candidates, reverse=self.direction_increasing, key=lambda tup: tup[0])
 
         # pick the candidate with the best metric, if it is better than the
         # current best candidate
