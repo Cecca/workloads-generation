@@ -3,3 +3,6 @@
 ans.csv
 __pycache__
 imgs
+/.data
+/results
+/.snakemake
