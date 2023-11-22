@@ -39,6 +39,8 @@ WORKLOADS = {
 "fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
 "glove-100": "glove-100-angular.hdf5",
 "glove-25": "glove-25-angular.hdf5",
+"glove-25-lid-25": "/tmp/glove-25-lid-25.hdf5",
+"glove-25-lid-68": "/tmp/glove-25-lid-68.hdf5",
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
 "sift": "sift-128-euclidean.hdf5",
@@ -53,6 +55,16 @@ WORKLOADS = {
 "sift-rc1.02": "sift-rc1.02.hdf5",
 "sift-rc3": "sift-rc3.hdf5",
 }
+
+
+def download(url, local):
+    if not os.path.isfile(local):
+        print("Downloading from", url)
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(local, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192): 
+                    f.write(chunk)
 
 
 def _download_ann_benchmarks(data_path):
@@ -74,6 +86,8 @@ def read_hdf5(filename, what, limit=None):
             data = hfp[what][:limit]
         else:
             data = hfp[what][:]
+    if distance_metric == "angular" and what in ["train", "test"]:
+        data /= np.linalg.norm(data, axis=1)[:, np.newaxis]
     return data, distance_metric
 
 

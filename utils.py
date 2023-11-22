@@ -30,7 +30,7 @@ def compute_distances(queries, k, metric, data_or_index):
         queries = np.array([queries])
 
     if metric == "angular":
-        assert np.all(np.isclose(1.0, np.linalg.norm(queries, axis=1))), f"queries should have unit norm, has norm {np.linalg.norm(query)} instead"
+        assert np.all(np.isclose(1.0, np.linalg.norm(queries, axis=1))), f"queries should have unit norm, has norm {np.linalg.norm(queries, axis=1)} instead"
 
     if hasattr(data_or_index, 'shape'):
         dataset = data_or_index

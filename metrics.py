@@ -82,6 +82,59 @@ def build_index(dataset, n_list, distance_metric):
     return index
 
 
+def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[]):
+    assert len( additional_header ) == len(additional_row)
+    dataset, distance_metric = rd.read_hdf5(dataset_path, "train")
+    queries, _ = rd.read_hdf5(queries_path, "test")
+
+    n_list = 32
+    index = build_index(dataset, n_list, distance_metric)
+
+    with open(output_path, "w", newline="") as fp:
+        writer = csv.writer(fp)
+
+        header = ["i", "lid_"+str(k), "rc_"+str(k), f"exp_{2*k}|{k}"]
+        # header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
+        header.extend(["distcomp", "recall", "elapsed"])
+        header.extend(additional_header)
+        writer.writerow(header)
+
+        nqueries = queries.shape[0]
+        for i in tqdm(range(nqueries)):
+            query = queries[i,:].astype(np.float32)
+            q_distances = compute_distances(query, None, distance_metric, dataset)[0]
+            # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k)
+            lid = compute_lid(q_distances, k, "linear")
+            rc = compute_rc(q_distances, k, "linear")
+            expansion = compute_expansion(q_distances, k, "linear")
+            
+            row = [i, lid, rc, expansion]
+            # row.extend(epsilons_hard)
+
+            # qq = np.array([query]) # just to comply with faiss API
+            distcomp = None
+            elapsed = None
+            for nprobe in range(1,1000):
+                faiss.cvar.indexIVF_stats.reset()
+                index.nprobe = nprobe
+                tstart = time.time()
+                run_dists = compute_distances(query, k, distance_metric, index)[0]
+                tend = time.time()
+                elapsed = tend - tstart
+                q_dists = q_distances
+
+                rec = compute_recall(q_dists, run_dists, k)
+                if rec >= target_recall:
+                    distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
+                    break
+
+            assert distcomp is not None
+            row.extend([distcomp, rec, elapsed])
+            row.extend(additional_row)
+
+            writer.writerow(row)
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()

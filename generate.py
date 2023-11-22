@@ -65,13 +65,11 @@ class RandomWalk(object):
             for _ in range(self.probes)
         ]
         end = time.time()
-        print("   time to generate candidates", end - start, "seconds")
         self.tested.extend(candidates)
         candidates = np.array(candidates)
         start = time.time()
         candidate_distances = utils.compute_distances(candidates, None, self.distance_metric, self.index)
         end = time.time()
-        print("   Time to compute distances", end - start, "seconds")
         candidates = [
             # (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
             ( self.compute_metric(dists, self.k) , c)
@@ -115,15 +113,21 @@ class RandomWalkAngular(RandomWalk):
         return query
 
     def generate_candidate(self, base):
-        coord = self.gen.integers(self.dim)
-        next_coord = (coord+1) % self.dim
-        rotation = np.identity(self.dim)
-        angle = self.gen.normal(scale=self.scale)
-        rotation[coord, coord] = np.cos(angle)
-        rotation[next_coord, next_coord] = np.cos(angle)
-        rotation[coord, next_coord] = -np.sin(angle)
-        rotation[next_coord, coord] = np.sin(angle)
-        query = np.dot(base, rotation)
+        # coord = self.gen.integers(self.dim)
+        # next_coord = (coord+1) % self.dim
+        # rotation = np.identity(self.dim)
+        # angle = self.gen.normal(scale=self.scale)
+        # rotation[coord, coord] = np.cos(angle)
+        # rotation[next_coord, next_coord] = np.cos(angle)
+        # rotation[coord, next_coord] = -np.sin(angle)
+        # rotation[next_coord, coord] = np.sin(angle)
+        # query = np.dot(base, rotation)
+        # query /= np.linalg.norm(query)
+        # print("    Angle", angle, "rad, dotp with base",
+        #       np.dot(query, base), "acos",
+        #       np.arccos(np.dot(query, base)))
+        offset = self.gen.normal(scale=self.scale, size=self.dim)
+        query = base + offset
         query /= np.linalg.norm(query)
         return query
 
@@ -182,6 +186,39 @@ def plot_path(dataset, q, path, tested):
     print(plt.ylim())
     plt.tight_layout()
     plt.savefig("zoomed.png")
+
+
+def generate_workload(dataset_input, queries_output, k, metric, target, num_queries, probes=8, scale=10, max_steps=300):
+    dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
+    print("loaded", dataset.shape)
+    if distance_metric == "angular":
+        walker_class = RandomWalkAngular
+    elif distance_metric == "euclidean":
+        walker_class = RandomWalkEuclidean
+    else:
+        raise NotImplementedError("Distance metric not implemented")
+
+    gen = np.random.default_rng(1234)
+    starting_ids = gen.choice(np.arange(dataset.shape[0]), size=num_queries, replace=False)
+    queries = []
+    for idx in starting_ids:
+        print("Starting from point", idx)
+        starting = dataset[idx,:]
+        walker = walker_class(
+            dataset,
+            k,
+            metric,
+            target=target,
+            probes=probes,
+            scale=scale,
+            max_steps=max_steps,
+            startquery = starting
+        )
+        qm, q = walker.run()
+        print("Generated query with metric", qm)
+        queries.append(q)
+    queries = np.stack(queries)
+    write_queries_hdf5(queries, queries_output)
 
 
 def main():
