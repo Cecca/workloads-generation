@@ -16,7 +16,8 @@ class RandomWalk(object):
         dataset,
         k,
         metric,
-        target,
+        target_low,
+        target_high,
         probes=4,
         scale=1.0,
         max_steps=100,
@@ -29,7 +30,8 @@ class RandomWalk(object):
         self.index.add(dataset)
         self.k = k
         self.metric = metric
-        self.target = target
+        self.target_low = target_low
+        self.target_high = target_high
         self.probes = probes
         self.scale = scale
         self.cnt_steps = 0
@@ -49,6 +51,7 @@ class RandomWalk(object):
         else:
             raise Exception("Unknown metric %s" % metric)
         self.direction_increasing = metric in ["lid", "loglid"]
+        print("random seed", seed)
         self.gen = np.random.default_rng(seed)
         self.path = []
         self.tested = []
@@ -61,6 +64,7 @@ class RandomWalk(object):
             self.candidate, None, self.distance_metric, self.index
         )[0, :]
         self.candidate_metric = self.compute_metric(candidate_distances)
+        assert self.easier_than(target_low, target_high)
 
     def harder_than(self, candidate_metric, target):
         if self.direction_increasing:
@@ -81,6 +85,7 @@ class RandomWalk(object):
         step_start = time.time()
         print("Step", self.cnt_steps, "metric", self.candidate_metric)
         self.cnt_steps += 1
+
         candidates = [
             self.generate_candidate(self.candidate).astype(np.float32)
             for _ in range(self.probes)
@@ -94,14 +99,43 @@ class RandomWalk(object):
             (self.compute_metric(dists), c)
             for c, dists in zip(candidates, candidate_distances)
         ]
+        # sort candidates by decreasing hardness
         candidates = sorted(
             candidates, reverse=self.direction_increasing, key=lambda tup: tup[0]
         )
 
+        # partition the candidates
+        harder = list(filter(lambda cand: self.harder_than(cand[0], self.target_high), candidates))
+        easier = list(filter(lambda cand: self.easier_than(cand[0], self.target_low), candidates))
+        hits = list(filter(
+            lambda cand: self.easier_than(cand[0], self.target_high) and self.harder_than(cand[0], self.target_low),
+            candidates
+        ))
+        print("harder", [t[0] for t in harder])
+        print("easier", [t[0] for t in easier])
+        print("hits", [t[0] for t in hits])
+
+        if len(hits) > 0:
+            # we found at least a candidate within the target difficulty range
+            new_metric, new_candidate = hits[0]
+            pick = True
+        elif len(easier) > 0:
+            # we generated easier queries, start from the most difficult one amongst those,
+            # leveraging the fact that they are already sorted by decreasing difficulty
+            new_metric, new_candidate = easier[0]
+            pick = self.harder_than(new_metric, self.candidate_metric)
+        else:
+            assert len(harder) > 0
+            # we generated harder queries, move the the easiest among those
+            new_metric, new_candidate = harder[-1]
+            pick = self.easier_than(new_metric, self.candidate_metric)
+            
+
         # pick the candidate with the best metric, if it is better than the
         # current best candidate
-        new_metric, new_candidate = candidates[0]
-        if self.harder_than(new_metric, self.candidate_metric):
+        # new_metric, new_candidate = candidates[0]
+        # if self.harder_than(new_metric, self.candidate_metric):
+        if pick:
             self.candidate_metric = new_metric
             self.candidate = new_candidate
             self.path.append(new_candidate)
@@ -110,7 +144,7 @@ class RandomWalk(object):
 
     def is_done(self):
         return (
-            self.harder_than(self.candidate_metric, self.target)
+            (self.harder_than(self.candidate_metric, self.target_low) and self.easier_than(self.candidate_metric, self.target_high))
             or self.cnt_steps >= self.max_steps
         )
 
@@ -132,7 +166,8 @@ class RandomWalkAngular(RandomWalk):
         dataset,
         k,
         metric,
-        target,
+        target_low,
+        target_high,
         probes=4,
         scale=1,
         max_steps=100,
@@ -143,7 +178,8 @@ class RandomWalkAngular(RandomWalk):
             dataset,
             k,
             metric,
-            target,
+            target_low,
+            target_high,
             probes,
             scale,
             max_steps,
@@ -158,22 +194,11 @@ class RandomWalkAngular(RandomWalk):
         return query
 
     def generate_candidate(self, base):
-        # coord = self.gen.integers(self.dim)
-        # next_coord = (coord+1) % self.dim
-        # rotation = np.identity(self.dim)
-        # angle = self.gen.normal(scale=self.scale)
-        # rotation[coord, coord] = np.cos(angle)
-        # rotation[next_coord, next_coord] = np.cos(angle)
-        # rotation[coord, next_coord] = -np.sin(angle)
-        # rotation[next_coord, coord] = np.sin(angle)
-        # query = np.dot(base, rotation)
-        # query /= np.linalg.norm(query)
-        # print("    Angle", angle, "rad, dotp with base",
-        #       np.dot(query, base), "acos",
-        #       np.arccos(np.dot(query, base)))
         offset = self.gen.normal(scale=self.scale, size=self.dim)
         query = base + offset
         query /= np.linalg.norm(query)
+        d = 1 - np.dot(base, query)
+        print("   angular distance from base point", d)
         return query
 
 
@@ -183,7 +208,8 @@ class RandomWalkEuclidean(RandomWalk):
         dataset,
         k,
         metric,
-        target,
+        target_low,
+        target_high,
         probes=4,
         scale=1,
         max_steps=100,
@@ -194,7 +220,8 @@ class RandomWalkEuclidean(RandomWalk):
             dataset,
             k,
             metric,
-            target,
+            target_low,
+            target_high,
             probes,
             scale,
             max_steps,
@@ -260,7 +287,8 @@ def generate_workload(
     queries_output,
     k,
     metric,
-    target,
+    target_low,
+    target_high,
     num_queries,
     probes=8,
     scale=10,
@@ -276,7 +304,7 @@ def generate_workload(
     else:
         raise NotImplementedError("Distance metric not implemented")
 
-    gen = np.random.default_rng(1234)
+    gen = np.random.default_rng(seed)
     starting_ids = gen.choice(
         np.arange(dataset.shape[0]), size=num_queries, replace=False
     )
@@ -288,7 +316,8 @@ def generate_workload(
             dataset,
             k,
             metric,
-            target=target,
+            target_low=target_low,
+            target_high=target_high,
             probes=probes,
             scale=scale,
             max_steps=max_steps,
@@ -311,7 +340,8 @@ def main():
         "--k", type=int, required=True, help="Number of nearest neighbors to find"
     )
     parser.add_argument("--metric", type=str, required=True, help="Difficult metric")
-    parser.add_argument("--target", type=float, required=True, help="Target difficulty")
+    parser.add_argument("--target-low", type=float, required=True, help="Target difficulty, lower bound")
+    parser.add_argument("--target-high", type=float, required=True, help="Target difficulty, upper bound")
     parser.add_argument(
         "--num-queries", type=int, default=100, help="Number of queries to generate"
     )
@@ -342,7 +372,8 @@ def main():
         args.queries_output,
         args.k,
         args.metric,
-        args.target,
+        args.target_low,
+        args.target_high,
         args.num_queries,
         args.probes,
         args.scale,
