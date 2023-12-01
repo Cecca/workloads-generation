@@ -11,8 +11,19 @@ import time
 
 
 class RandomWalk(object):
-    def __init__(self, dataset, k, metric, target, probes=4, scale=1.0,
-                 max_steps=100, seed=1234, startquery=None, distance_metric="angular"):
+    def __init__(
+        self,
+        dataset,
+        k,
+        metric,
+        target,
+        probes=4,
+        scale=1.0,
+        max_steps=100,
+        seed=1234,
+        startquery=None,
+        distance_metric="angular",
+    ):
         self.dataset = dataset
         self.index = faiss.IndexFlatL2(dataset.shape[1])
         self.index.add(dataset)
@@ -28,26 +39,37 @@ class RandomWalk(object):
         self.dim = dataset.shape[1]
         # whether the direction of "harder" queries is increasing, metric-wise
         if "lid" == metric:
-            self.compute_metric = lambda dists, k: dm.compute_lid(dists, k, "linear")
+            self.compute_metric = lambda dists: dm.compute_lid(dists, k, "linear")
         elif "rc" == metric:
-            self.compute_metric = lambda dists, k: dm.compute_rc(dists, k, "linear")
+            self.compute_metric = lambda dists: dm.compute_rc(dists, k, "linear")
         elif "expansion" == metric:
-            self.compute_metric = lambda dists, k: dm.compute_expansion(dists, k, "linear")
+            self.compute_metric = lambda dists: dm.compute_expansion(
+                dists, k, "linear"
+            )
         else:
             raise Exception("Unknown metric %s" % metric)
         self.direction_increasing = metric in ["lid", "loglid"]
         self.gen = np.random.default_rng(seed)
         self.path = []
         self.tested = []
-        self.candidate = startquery if startquery is not None else self.generate_random_point().astype(np.float32)
-        candidate_distances = utils.compute_distances(self.candidate, None, self.distance_metric, self.index)[0,:]
-        self.candidate_metric = self.compute_metric(candidate_distances, self.k)
+        self.candidate = (
+            startquery
+            if startquery is not None
+            else self.generate_random_point().astype(np.float32)
+        )
+        candidate_distances = utils.compute_distances(
+            self.candidate, None, self.distance_metric, self.index
+        )[0, :]
+        self.candidate_metric = self.compute_metric(candidate_distances)
 
     def harder_than(self, candidate_metric, target):
         if self.direction_increasing:
             return candidate_metric > target
         else:
             return candidate_metric < target
+
+    def easier_than(self, candidate_metric, target):
+        return not self.harder_than(candidate_metric, target)
 
     def generate_random_point(self):
         raise NotImplementedError()
@@ -59,23 +81,22 @@ class RandomWalk(object):
         step_start = time.time()
         print("Step", self.cnt_steps, "metric", self.candidate_metric)
         self.cnt_steps += 1
-        start = time.time()
         candidates = [
-            self.generate_candidate(self.candidate).astype(np.float32) 
+            self.generate_candidate(self.candidate).astype(np.float32)
             for _ in range(self.probes)
         ]
-        end = time.time()
         self.tested.extend(candidates)
         candidates = np.array(candidates)
-        start = time.time()
-        candidate_distances = utils.compute_distances(candidates, None, self.distance_metric, self.index)
-        end = time.time()
+        candidate_distances = utils.compute_distances(
+            candidates, None, self.distance_metric, self.index
+        )
         candidates = [
-            # (dm.compute(c, self.dataset, self.metric, self.k, distance_metric=self.distance_metric), c)
-            ( self.compute_metric(dists, self.k) , c)
+            (self.compute_metric(dists), c)
             for c, dists in zip(candidates, candidate_distances)
         ]
-        candidates = sorted(candidates, reverse=self.direction_increasing, key=lambda tup: tup[0])
+        candidates = sorted(
+            candidates, reverse=self.direction_increasing, key=lambda tup: tup[0]
+        )
 
         # pick the candidate with the best metric, if it is better than the
         # current best candidate
@@ -88,9 +109,11 @@ class RandomWalk(object):
         print("Step time", step_end - step_start, "seconds")
 
     def is_done(self):
-        return self.harder_than(self.candidate_metric, self.target) or self.cnt_steps >= self.max_steps
+        return (
+            self.harder_than(self.candidate_metric, self.target)
+            or self.cnt_steps >= self.max_steps
+        )
 
-    
     def run(self):
         while not self.is_done():
             self.move_next()
@@ -104,8 +127,30 @@ class RandomWalk(object):
 
 
 class RandomWalkAngular(RandomWalk):
-    def __init__(self, dataset, k, metric, target, probes=4, scale=1, max_steps=100, seed=1234, startquery=None):
-        super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="angular")
+    def __init__(
+        self,
+        dataset,
+        k,
+        metric,
+        target,
+        probes=4,
+        scale=1,
+        max_steps=100,
+        seed=1234,
+        startquery=None,
+    ):
+        super().__init__(
+            dataset,
+            k,
+            metric,
+            target,
+            probes,
+            scale,
+            max_steps,
+            seed,
+            startquery,
+            distance_metric="angular",
+        )
 
     def generate_random_point(self):
         query = self.gen.normal(size=self.dim)
@@ -133,8 +178,30 @@ class RandomWalkAngular(RandomWalk):
 
 
 class RandomWalkEuclidean(RandomWalk):
-    def __init__(self, dataset, k, metric, target, probes=4, scale=1, max_steps=100, seed=1234, startquery=None):
-        super().__init__(dataset, k, metric, target, probes, scale, max_steps, seed, startquery, distance_metric="euclidean")
+    def __init__(
+        self,
+        dataset,
+        k,
+        metric,
+        target,
+        probes=4,
+        scale=1,
+        max_steps=100,
+        seed=1234,
+        startquery=None,
+    ):
+        super().__init__(
+            dataset,
+            k,
+            metric,
+            target,
+            probes,
+            scale,
+            max_steps,
+            seed,
+            startquery,
+            distance_metric="euclidean",
+        )
 
     def generate_random_point(self):
         mins = np.min(self.dataset, axis=0)
@@ -159,36 +226,47 @@ def plot_path(dataset, q, path, tested):
     path = pca.transform(path)
     tested = pca.transform(tested)
 
-    plt.figure(figsize=(10,10))
-    plt.scatter(proj[:,0], proj[:,1], s=1, zorder=0)
-    plt.scatter(q[:,0], q[:,1], s=20, c="red", zorder=10)
-    plt.scatter(path[:,0], path[:,1], c="orange", zorder=3)
-    plt.scatter(tested[:,0], tested[:,1], c="yellow", s=2, zorder=2)
-    plt.plot(path[:,0], path[:,1], c="orange", zorder=1)
+    plt.figure(figsize=(10, 10))
+    plt.scatter(proj[:, 0], proj[:, 1], s=1, zorder=0)
+    plt.scatter(q[:, 0], q[:, 1], s=20, c="red", zorder=10)
+    plt.scatter(path[:, 0], path[:, 1], c="orange", zorder=3)
+    plt.scatter(tested[:, 0], tested[:, 1], c="yellow", s=2, zorder=2)
+    plt.plot(path[:, 0], path[:, 1], c="orange", zorder=1)
     plt.savefig("generated.png")
 
-    plt.figure(figsize=(10,10))
-    plt.scatter(proj[:,0], proj[:,1], s=1, zorder=0)
-    plt.scatter(q[:,0], q[:,1], s=20, c="red", zorder=10, edgecolors="black")
-    plt.scatter(path[:,0], path[:,1], c="orange", zorder=3, edgecolors="black")
-    plt.scatter(tested[:,0], tested[:,1], c="yellow", zorder=2, edgecolors="black")
-    plt.plot(path[:,0], path[:,1], c="orange", zorder=1)
+    plt.figure(figsize=(10, 10))
+    plt.scatter(proj[:, 0], proj[:, 1], s=1, zorder=0)
+    plt.scatter(q[:, 0], q[:, 1], s=20, c="red", zorder=10, edgecolors="black")
+    plt.scatter(path[:, 0], path[:, 1], c="orange", zorder=3, edgecolors="black")
+    plt.scatter(tested[:, 0], tested[:, 1], c="yellow", zorder=2, edgecolors="black")
+    plt.plot(path[:, 0], path[:, 1], c="orange", zorder=1)
     scale = 4
-    xmin = path[:,0].min()
-    ymin = path[:,1].min()
-    xmax = path[:,0].max()
-    ymax = path[:,1].max()
+    xmin = path[:, 0].min()
+    ymin = path[:, 1].min()
+    xmax = path[:, 0].max()
+    ymax = path[:, 1].max()
     xext = abs(xmax - xmin)
     yext = abs(ymax - ymin)
-    plt.xlim(xmin - scale*xext, xmax + scale*xext)
-    plt.ylim(ymin - scale*yext, ymax + scale*yext)
+    plt.xlim(xmin - scale * xext, xmax + scale * xext)
+    plt.ylim(ymin - scale * yext, ymax + scale * yext)
     print(plt.xlim())
     print(plt.ylim())
     plt.tight_layout()
     plt.savefig("zoomed.png")
 
 
-def generate_workload(dataset_input, queries_output, k, metric, target, num_queries, probes=8, scale=10, max_steps=300):
+def generate_workload(
+    dataset_input,
+    queries_output,
+    k,
+    metric,
+    target,
+    num_queries,
+    probes=8,
+    scale=10,
+    max_steps=300,
+    seed=1234,
+):
     dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
     print("loaded", dataset.shape)
     if distance_metric == "angular":
@@ -199,11 +277,13 @@ def generate_workload(dataset_input, queries_output, k, metric, target, num_quer
         raise NotImplementedError("Distance metric not implemented")
 
     gen = np.random.default_rng(1234)
-    starting_ids = gen.choice(np.arange(dataset.shape[0]), size=num_queries, replace=False)
+    starting_ids = gen.choice(
+        np.arange(dataset.shape[0]), size=num_queries, replace=False
+    )
     queries = []
     for idx in starting_ids:
         print("Starting from point", idx)
-        starting = dataset[idx,:]
+        starting = dataset[idx, :]
         walker = walker_class(
             dataset,
             k,
@@ -212,7 +292,8 @@ def generate_workload(dataset_input, queries_output, k, metric, target, num_quer
             probes=probes,
             scale=scale,
             max_steps=max_steps,
-            startquery = starting
+            startquery=starting,
+            seed=seed,
         )
         qm, q = walker.run()
         print("Generated query with metric", qm)
@@ -223,95 +304,58 @@ def generate_workload(dataset_input, queries_output, k, metric, target, num_quer
 
 def main():
     import argparse
-    import os
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True, help='Path to the dataset file')
-    parser.add_argument('--query', required=True, help='Path to the query file')
-    parser.add_argument('--k', type=int, required=True, help='Number of nearest neighbors to find')
-    parser.add_argument('--metric', type=str, required=True, help='Difficult metric')
-    parser.add_argument('--target', type=float, required=True, help='Target difficulty')
-    parser.add_argument('--probes', type=int, required=True, help='Number of probes to use')
-    parser.add_argument('--scale', type=float, required=False, default=10.0, help='Noise scale')
-    parser.add_argument('--max-steps', type=int, required=False, default=100, help='Number of random walk steps (maximum)')
-    parser.add_argument('--data_limit', type=int,  help='Maximum number of data points to load from the dataset file')
-    parser.add_argument('--query_limit', type=int,  help='Maximum number of query points to load from the query file')
-    parser.add_argument('--start-from-datapoint', type=int,  help='Datapoint from which to make the search start')
-    parser.add_argument('--num-queries', type=int,  help='Number of queries to generate')
-    parser.add_argument('--queries-output', type=str,  help='Path to queries output file')
-
+    parser.add_argument("--dataset", required=True, help="Path to the dataset file")
+    parser.add_argument(
+        "--k", type=int, required=True, help="Number of nearest neighbors to find"
+    )
+    parser.add_argument("--metric", type=str, required=True, help="Difficult metric")
+    parser.add_argument("--target", type=float, required=True, help="Target difficulty")
+    parser.add_argument(
+        "--num-queries", type=int, default=100, help="Number of queries to generate"
+    )
+    parser.add_argument(
+        "--queries-output", type=str, required=True, help="Path to queries output file"
+    )
+    parser.add_argument(
+        "--probes", type=int, required=True, help="Number of probes to use"
+    )
+    parser.add_argument(
+        "--scale", type=float, required=False, default=10.0, help="Noise scale"
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        required=False,
+        default=1000,
+        help="Number of random walk steps (maximum)",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=1234, help="seed for the random number generator"
+    )
 
     args = parser.parse_args()
 
-    dataset_name = args.dataset
-    queryset_name = args.query
-    dataset, _queries, _distances, distance_metric = read_data.read_data(dataset_name, queryset_name)
-    print("Dataset with shape", dataset.shape)
-    k = args.k
-    metric = args.metric
-    target = args.target
-    probes = args.probes
-    scale = args.scale
-    max_steps = args.max_steps
-    if args.start_from_datapoint is not None:
-        starting = dataset[args.start_from_datapoint,:]
-    else:
-        starting = None
-
-    if distance_metric == "angular":
-        walker_class = RandomWalkAngular
-    elif distance_metric == "euclidean":
-        walker_class = RandomWalkEuclidean
-    else:
-        raise NotImplementedError("Distance metric not implemented")
-
-    if args.num_queries is None:
-        walker = walker_class(
-            dataset,
-            k,
-            metric,
-            target=target,
-            probes=probes,
-            scale=scale,
-            max_steps=max_steps,
-            startquery = starting
-        )
-
-        qm, q = walker.run()
-        print("Generated query with metric", qm)
-        plot_path(dataset, q, walker.get_path(), walker.get_tested())
-    else:
-        assert args.queries_output is not None
-        if os.path.isfile(args.queries_output):
-            exit(f"File {args.queries_output} already exists, provide another one")
-        gen = np.random.default_rng(1234)
-        starting_ids = gen.choice(np.arange(dataset.shape[0]), size=args.num_queries, replace=False)
-        queries = []
-        for idx in starting_ids:
-            print("Starting from point", idx)
-            starting = dataset[idx,:]
-            walker = walker_class(
-                dataset,
-                k,
-                metric,
-                target=target,
-                probes=probes,
-                scale=scale,
-                max_steps=max_steps,
-                startquery = starting
-            )
-            qm, q = walker.run()
-            print("Generated query with metric", qm)
-            queries.append(q)
-        queries = np.stack(queries)
-        write_queries_hdf5(queries, args.queries_output)
-
+    generate_workload(
+        args.dataset,
+        args.queries_output,
+        args.k,
+        args.metric,
+        args.target,
+        args.num_queries,
+        args.probes,
+        args.scale,
+        args.max_steps,
+        args.seed,
+    )
 
 
 def write_queries_hdf5(queries, path):
     import h5py
+
     with h5py.File(path, "w") as hfp:
-        hfp['test'] = queries
+        hfp["test"] = queries
 
 
 if __name__ == "__main__":
