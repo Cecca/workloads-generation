@@ -10,6 +10,94 @@ import utils
 import time
 
 
+def annealing(
+    score, start_point, gen_neighbor, target_low, target_high, temperature, max_steps=100
+):
+    """
+    Parameters
+    ==========
+
+    :score: a function accepting a single point and returning a floating point value: higher
+            values correspond to more difficult points
+    :start_point: the starting point of the annealing process
+    :gen_neighbor: takes the current point and generates a neighbor
+    :target_low: the lower bound to the score we want to achieve
+    :target_high: the upper bound to the score we want to achieve
+    :temperature: the temperature schedule, or how the process cools with the iterations
+    :max_steps: the maximum number of steps we allow
+    """
+    import random
+    from math import exp
+
+    assert target_low <= target_high
+    x, y = start_point, score(start_point)
+
+    for step in range(max_steps):
+        print(step)
+        x_next = gen_neighbor(x)
+        y_next = score(x_next)
+        if target_low <= y_next <= target_high:
+            print("Returning query point with score", y_next)
+            return x_next
+        elif y <= y_next <= target_low or target_high <= y_next <= y:
+            # the next candidate goes towards the desired range
+            x, y = x_next, y_next
+            print("move to better candidate with score", y, "rc = ", np.exp(-y))
+        else:
+            # we pick the neighbor by the Metropolis criterion
+            delta = abs(y - y_next)
+            t = temperature(step)
+            p = exp(-delta / t)
+            print("temperature ", t, "delta", delta, "p=", p)
+            if random.random() < p:
+                x, y = x_next, y_next
+                print("move to WORSE candidate with score", y, "rc = ", np.exp(-y))
+            pass
+
+    raise Exception("Could not find point in the desired range")
+
+
+def fast_annealing_schedule(t1):
+    def inner(step):
+        return t1 / (step+1)
+    return inner
+
+
+def transform_rc(rc):
+    """
+    Scale transform the relative contrast so that higher values correspond to
+    more difficulty queries
+    """
+    return -np.log(rc)
+
+
+def relative_contrast_scorer(index, distance_metric, k):
+    def inner(x):
+        distances = utils.compute_distances(
+            x, None, distance_metric, index
+        )[0, :]
+        rc = dm.compute_rc(distances, k, scale="linear")
+        return transform_rc(rc)
+    return inner
+
+
+def neighbor_generator_angular(scale, rng):
+    def inner(x):
+        offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        neighbor = x + offset
+        neighbor /= np.linalg.norm(neighbor)
+        return neighbor
+    return inner
+
+
+def neighbor_generator_euclidean(scale, rng):
+    def inner(x):
+        offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        neighbor = x + offset
+        return neighbor
+    return inner
+
+
 class RandomWalk(object):
     def __init__(
         self,
@@ -45,9 +133,7 @@ class RandomWalk(object):
         elif "rc" == metric:
             self.compute_metric = lambda dists: dm.compute_rc(dists, k, "linear")
         elif "expansion" == metric:
-            self.compute_metric = lambda dists: dm.compute_expansion(
-                dists, k, "linear"
-            )
+            self.compute_metric = lambda dists: dm.compute_expansion(dists, k, "linear")
         else:
             raise Exception("Unknown metric %s" % metric)
         self.direction_increasing = metric in ["lid", "loglid"]
@@ -105,12 +191,19 @@ class RandomWalk(object):
         )
 
         # partition the candidates
-        harder = list(filter(lambda cand: self.harder_than(cand[0], self.target_high), candidates))
-        easier = list(filter(lambda cand: self.easier_than(cand[0], self.target_low), candidates))
-        hits = list(filter(
-            lambda cand: self.easier_than(cand[0], self.target_high) and self.harder_than(cand[0], self.target_low),
-            candidates
-        ))
+        harder = list(
+            filter(lambda cand: self.harder_than(cand[0], self.target_high), candidates)
+        )
+        easier = list(
+            filter(lambda cand: self.easier_than(cand[0], self.target_low), candidates)
+        )
+        hits = list(
+            filter(
+                lambda cand: self.easier_than(cand[0], self.target_high)
+                and self.harder_than(cand[0], self.target_low),
+                candidates,
+            )
+        )
         print("harder", [t[0] for t in harder])
         print("easier", [t[0] for t in easier])
         print("hits", [t[0] for t in hits])
@@ -129,7 +222,6 @@ class RandomWalk(object):
             # we generated harder queries, move the the easiest among those
             new_metric, new_candidate = harder[-1]
             pick = self.easier_than(new_metric, self.candidate_metric)
-            
 
         # pick the candidate with the best metric, if it is better than the
         # current best candidate
@@ -144,9 +236,9 @@ class RandomWalk(object):
 
     def is_done(self):
         return (
-            (self.harder_than(self.candidate_metric, self.target_low) and self.easier_than(self.candidate_metric, self.target_high))
-            or self.cnt_steps >= self.max_steps
-        )
+            self.harder_than(self.candidate_metric, self.target_low)
+            and self.easier_than(self.candidate_metric, self.target_high)
+        ) or self.cnt_steps >= self.max_steps
 
     def run(self):
         while not self.is_done():
@@ -331,6 +423,7 @@ def generate_workload(
     write_queries_hdf5(queries, queries_output)
 
 
+
 def main():
     import argparse
 
@@ -340,8 +433,15 @@ def main():
         "--k", type=int, required=True, help="Number of nearest neighbors to find"
     )
     parser.add_argument("--metric", type=str, required=True, help="Difficult metric")
-    parser.add_argument("--target-low", type=float, required=True, help="Target difficulty, lower bound")
-    parser.add_argument("--target-high", type=float, required=True, help="Target difficulty, upper bound")
+    parser.add_argument(
+        "--target-low", type=float, required=True, help="Target difficulty, lower bound"
+    )
+    parser.add_argument(
+        "--target-high",
+        type=float,
+        required=True,
+        help="Target difficulty, upper bound",
+    )
     parser.add_argument(
         "--num-queries", type=int, default=100, help="Number of queries to generate"
     )
@@ -389,5 +489,81 @@ def write_queries_hdf5(queries, path):
         hfp["test"] = queries
 
 
+def main_annealing():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", required=True, help="Path to the dataset file")
+    parser.add_argument(
+        "--k", type=int, required=True, help="Number of nearest neighbors to find"
+    )
+    parser.add_argument("--metric", type=str, required=True, help="Difficult metric")
+    parser.add_argument(
+        "--target-low", type=float, required=True, help="Target difficulty, lower bound"
+    )
+    parser.add_argument(
+        "--target-high",
+        type=float,
+        required=True,
+        help="Target difficulty, upper bound",
+    )
+    parser.add_argument(
+        "--scale", type=float, required=False, default=10.0, help="Noise scale"
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        required=False,
+        default=1000,
+        help="Number of random walk steps (maximum)",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=1234, help="seed for the random number generator"
+    )
+
+    args = parser.parse_args()
+
+    gen = np.random.default_rng(args.seed)
+
+    dataset, distance_metric = read_data.read_hdf5(args.dataset, "train")
+    print("loaded dataset with shape", dataset.shape)
+
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+
+    neighbor_generators = {
+        "angular": neighbor_generator_angular(args.scale, gen),
+        "euclidean": neighbor_generator_euclidean(args.scale, gen)
+    }
+    gen_neighbor = neighbor_generators[distance_metric]
+
+    scoring_functions = {
+        "rc": relative_contrast_scorer(index, distance_metric, args.k)
+    }
+    score = scoring_functions[args.metric]
+
+    score_transforms = {
+        "rc": transform_rc
+    }
+    score_transform = score_transforms[args.metric]
+    target_low = score_transform(args.target_low)
+    target_high = score_transform(args.target_high)
+
+    num_queries = 1
+    starting_ids = gen.choice(
+        np.arange(dataset.shape[0]), size=num_queries, replace=False
+    )
+
+    q = annealing(
+        score,
+        dataset[starting_ids[0],:],
+        gen_neighbor,
+        target_low,
+        target_high,
+        fast_annealing_schedule(10.0),
+        max_steps = args.max_steps
+    )
+
 if __name__ == "__main__":
-    main()
+    main_annealing()
+    
