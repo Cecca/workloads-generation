@@ -1,17 +1,70 @@
-from snakemake.utils import min_version
+############################################################
+#
+# General introduction
+# ====================
+#
+# This Snakefile coordinates the execution of the following, 
+# among other things:
+#
+#  - Download and preprocessing of datasets
+#  - Generation of synthetic query workloads under different
+#    parameterizations
+#  - Plotting of the resulting difficulty metrics
+#
+# This file works a lot like a Makefile with wildcard
+# patterns. In particular, there are several `rule` blocks,
+# each defining its input and output files. Snakemake then
+# infers the dependencies between tasks by matching file
+# names. Then, file names can have "wildcards" in them, i.e.
+# placeholders that will be made available to rule bodies
+# (marked with the `run` block) as parameters.
+#
+# The execution therefore proceeds lazily. If we run, on 
+# the command line
+#
+#     snakemake --cores all plot_syntetic_difficulty
+#
+# then snakemake will look at any missing input of the
+# plot_syntetic_difficulty rule, and compute it, possibly
+# computing any other missing file recursively, down to the
+# input files.
+#
+# Rules in Snakemake (rather, their `run` block) can be
+# written directly in Python
+
+
+############################################################
+#
+# General setup
+#
+############################################################
+
 # Here we list the minimum accepted snakemake version
+from snakemake.utils import min_version
 min_version("7.24")
 
+# We can import other packages. One cool thing of Snakemake
+# is that the entire Snakefile can be scripted with Python
 import pandas as pd
 from parameters import setup_param_space
 
+# This `paramspace` variable is a wrapper around a dataframe
+# that holds all the parameter combinations we want to
+# test. These parameter combinations are set up in the
+# function in setup_param_space().
+# More on this here: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#parameter-space-exploration
 paramspace = setup_param_space()
 print(paramspace.dataframe)
 
+# For convenience, here we extract the set of datasets we
+# use in this evaluation.
 DATASETS = set(paramspace.dataframe['dataset'])
 
 
-rule plot_syntetic_difficulty:
+# This rule plots the number of distance computations against
+# the RC metric for different datasets, coloring points
+# according to their "difficulty group"
+rule plot_synthetic_difficulty:
     input:
         metrics = "results/metrics/all-synthetic.csv"
     output:
@@ -21,24 +74,23 @@ rule plot_syntetic_difficulty:
         matplotlib.use("Agg")
         from matplotlib import pyplot as plt
         import seaborn as sns
+        import seaborn.objects as so
         import pandas as pd
 
         df = pd.read_csv(input["metrics"])
-        df["target_rc"] = df["target_rc"].astype(str)
-        averages = df.groupby(["dataset", "target_rc"]).mean()
+        df["target_rc"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
+        averages = df.groupby(["dataset", "target_rc"]).mean().reset_index()
 
-        sns.relplot(
-          data = df,
-          x = "rc_10",
-          y = "distcomp",
-          hue = "target_rc",
-          col = "dataset",
-          col_wrap = 3,
-          facet_kws = {"sharey": False}
+        (
+          so.Plot(df, x="rc_10", y="distcomp", color="target_rc")
+            .facet("dataset")
+            .add(so.Dot())
+            .add(so.Dot(color="black"), data=averages)
+            .save(output[0])
         )
-        plt.savefig(output[0])
 
-
+# This task computes the CSV file for the metrics
+# of the queries builtin each dataset.
 rule metrics_builtin_queries:
     input:
         expand(
@@ -55,6 +107,8 @@ rule metrics_builtin_queries:
         df.to_csv(output[0], index=False)
 
 
+# Here we compute the metrics for each individual dataset, this
+# a subtask of `metrics_builtin_queries`
 rule eval_metrics_builtin_queries:
     input:
         ".data/{name}.hdf5"
@@ -72,15 +126,13 @@ rule eval_metrics_builtin_queries:
         )
 
 
+# Here we bring in a single csv file the metrics computed
+# on the syntehtic query sets
 rule synthetic_metrics:
     input:
         expand(
           "results/metrics/{params}.csv",
           params=paramspace.instance_patterns
-          #name      = DATASETS,
-          #k         = [10],
-          #target_rc = [2.0, 1.5, 1.2, 1.05],
-          #num_queries = [10]
         )
     output:
         "results/metrics/all-synthetic.csv"
@@ -90,11 +142,12 @@ rule synthetic_metrics:
         df.to_csv(output[0], index=False)
 
 
+# Here we generate syntehtic query sets, guided by the
+# relative contrast metric
 rule generate_rc:
     input:
         ".data/{dataset}.hdf5"
     output:
-        #".generated/{name}-queries{num_queries}-k{k}-rc{target_rc}.hdf5",
         f".generated/{paramspace.wildcard_pattern}.hdf5",
     threads: workflow.cores / 2
     params:
@@ -113,12 +166,14 @@ rule generate_rc:
           probes = int(wildcards['nprobes'])
         )
 
+
+# And finally here we compute the metrics of the synthetic
+# query sets
 rule eval_metrics:
     input:
         data = ".data/{dataset}.hdf5",
         queries = f".generated/{paramspace.wildcard_pattern}.hdf5"
     output:
-        #"results/metrics/{name}-queries{num_queries}-k{k}-rc{target_rc}.csv"
         f"results/metrics/{paramspace.wildcard_pattern}.csv",
     params:
         conf = paramspace.instance
@@ -136,6 +191,10 @@ rule eval_metrics:
 ################################################################################
 #
 # UMAP Embeddings
+# ===============
+#
+# This is still a draft, computing the UMAP embeddings for the
+# datasets, to visualize them in two dimensions.
 #
 ################################################################################
 

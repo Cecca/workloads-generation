@@ -4,7 +4,7 @@ from snakemake.utils import Paramspace
 def setup_param_space():
     datasets = [
         "fashion-mnist-784-euclidean",
-        #"glove-100-angular",
+        "glove-100-angular",
         #"glove-25-angular",
         #"glove-200-angular",
         # "mnist-784-euclidean",
@@ -17,17 +17,24 @@ def setup_param_space():
                 (1.55, 1.45),
                 (1.25, 1.15),
                 (1.05, 1.01),
+            ],
+            "glove-100-angular": [
+                (2.05, 1.95),
+                (1.55, 1.45)
             ]
         }
     }
     num_queries = {
-        "fashion-mnist-784-euclidean": [100]
+        "fashion-mnist-784-euclidean": [100],
+        "glove-100-angular": [100]
     }
     scale = {
-        "fashion-mnist-784-euclidean": [10] 
+        "fashion-mnist-784-euclidean": [10],
+        "glove-100-angular": [0.1] 
     }
     nprobes = {
-        "fashion-mnist-784-euclidean": [8]
+        "fashion-mnist-784-euclidean": [8],
+        "glove-100-angular": [1]
     }
     ks = [10]
 
