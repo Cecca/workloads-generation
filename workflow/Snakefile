@@ -1,21 +1,14 @@
 from snakemake.utils import min_version
-from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
-
 # Here we list the minimum accepted snakemake version
 min_version("7.24")
 
+import pandas as pd
+from parameters import setup_param_space
 
-HTTP = HTTPRemoteProvider(keep_local=True)
+paramspace = setup_param_space()
+print(paramspace.dataframe)
 
-
-DATASETS = [
-  "fashion-mnist-784-euclidean",
-  #"glove-100-angular",
-  #"glove-25-angular",
-  #"glove-200-angular",
-  "mnist-784-euclidean",
-  #"sift-128-euclidean"
-]
+DATASETS = set(paramspace.dataframe['dataset'])
 
 
 rule plot_syntetic_difficulty:
@@ -82,11 +75,12 @@ rule eval_metrics_builtin_queries:
 rule synthetic_metrics:
     input:
         expand(
-          "results/metrics/{name}-queries{num_queries}-k{k}-rc{target_rc}.csv",
-          name      = DATASETS,
-          k         = [10],
-          target_rc = [2.0, 1.5, 1.2, 1.05],
-          num_queries = [10]
+          "results/metrics/{params}.csv",
+          params=paramspace.instance_patterns
+          #name      = DATASETS,
+          #k         = [10],
+          #target_rc = [2.0, 1.5, 1.2, 1.05],
+          #num_queries = [10]
         )
     output:
         "results/metrics/all-synthetic.csv"
@@ -98,27 +92,36 @@ rule synthetic_metrics:
 
 rule generate_rc:
     input:
-        ".data/{name}.hdf5"
+        ".data/{dataset}.hdf5"
     output:
-        ".generated/{name}-queries{num_queries}-k{k}-rc{target_rc}.hdf5",
+        #".generated/{name}-queries{num_queries}-k{k}-rc{target_rc}.hdf5",
+        f".generated/{paramspace.wildcard_pattern}.hdf5",
     threads: workflow.cores / 2
+    params:
+        paramspace.instance
     run:
         import generate
         generate.generate_workload(
           input[0],
           output[0],
           k = int(wildcards['k']),
-          metric = "rc",
-          target = float(wildcards['target_rc']),
-          num_queries = int(wildcards['num_queries'])
+          metric = wildcards["difficulty"],
+          target_low = float(wildcards['target_lower']),
+          target_high = float(wildcards['target_upper']),
+          num_queries = int(wildcards['num_queries']),
+          scale = float(wildcards['scale']),
+          probes = int(wildcards['nprobes'])
         )
 
 rule eval_metrics:
     input:
-        data = ".data/{name}.hdf5",
-        queries = ".generated/{name}-queries{num_queries}-k{k}-rc{target_rc}.hdf5"
+        data = ".data/{dataset}.hdf5",
+        queries = f".generated/{paramspace.wildcard_pattern}.hdf5"
     output:
-        "results/metrics/{name}-queries{num_queries}-k{k}-rc{target_rc}.csv"
+        #"results/metrics/{name}-queries{num_queries}-k{k}-rc{target_rc}.csv"
+        f"results/metrics/{paramspace.wildcard_pattern}.csv",
+    params:
+        conf = paramspace.instance
     run:
         import metrics
         metrics.metrics_csv(
@@ -126,8 +129,8 @@ rule eval_metrics:
           input['queries'],
           output[0],
           int(wildcards['k']),
-          additional_header = ["dataset", "target_rc"],
-          additional_row = [wildcards['name'], float(wildcards['target_rc'])]
+          additional_header = ["dataset", "target_low", "target_high"],
+          additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper'])]
         )
 
 ################################################################################
