@@ -2,16 +2,81 @@
 This module collects approaches to generate workloads for a given dataset.
 """
 
+import os
 import numpy as np
 import dimensionality_measures as dm
 import read_data
 import faiss
 import utils
 import time
+from concurrent.futures import ThreadPoolExecutor
+
+
+def generate_queries_annealing(
+    dataset,
+    distance_metric,
+    k,
+    metric,
+    target_low,
+    target_high,
+    num_queries,
+    scale,
+    max_steps=10000,
+    initial_temperature=10,
+    seed=1234,
+    threads = os.cpu_count()
+):
+    gen = np.random.default_rng(seed)
+
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+
+    neighbor_generators = {
+        "angular": neighbor_generator_angular(scale, gen),
+        "euclidean": neighbor_generator_euclidean(scale, gen),
+    }
+    gen_neighbor = neighbor_generators[distance_metric]
+
+    scoring_functions = {"rc": relative_contrast_scorer(index, distance_metric, k)}
+    score = scoring_functions[metric]
+
+    score_transforms = {"rc": transform_rc}
+    score_transform = score_transforms[metric]
+    target_low = score_transform(target_low)
+    target_high = score_transform(target_high)
+
+    starting_ids = list(
+        gen.choice(np.arange(dataset.shape[0]), size=num_queries, replace=False)
+    )
+    print(starting_ids)
+
+    with ThreadPoolExecutor(threads) as pool:
+        queries = list(
+            pool.map(
+                lambda x: annealing(
+                    score,
+                    dataset[x, :],
+                    gen_neighbor,
+                    target_low,
+                    target_high,
+                    fast_annealing_schedule(initial_temperature),
+                    max_steps=max_steps,
+                ),
+                starting_ids,
+            )
+        )
+    queries = np.vstack(queries)
+    return queries
 
 
 def annealing(
-    score, start_point, gen_neighbor, target_low, target_high, temperature, max_steps=100
+    score,
+    start_point,
+    gen_neighbor,
+    target_low,
+    target_high,
+    temperature,
+    max_steps=100,
 ):
     """
     Parameters
@@ -31,9 +96,13 @@ def annealing(
 
     assert target_low <= target_high
     x, y = start_point, score(start_point)
+    print("start from score", y)
+    if y > target_low:
+        print("point is already in the desired range")
+        # FIXME: find out how to efficiently navigate towards easier points
+        return x
 
     for step in range(max_steps):
-        print(step)
         x_next = gen_neighbor(x)
         y_next = score(x_next)
         if target_low <= y_next <= target_high:
@@ -42,16 +111,13 @@ def annealing(
         elif y <= y_next <= target_low or target_high <= y_next <= y:
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
-            print("move to better candidate with score", y, "rc = ", np.exp(-y))
         else:
             # we pick the neighbor by the Metropolis criterion
             delta = abs(y - y_next)
             t = temperature(step)
             p = exp(-delta / t)
-            print("temperature ", t, "delta", delta, "p=", p)
             if random.random() < p:
                 x, y = x_next, y_next
-                print("move to WORSE candidate with score", y, "rc = ", np.exp(-y))
             pass
 
     raise Exception("Could not find point in the desired range")
@@ -59,7 +125,8 @@ def annealing(
 
 def fast_annealing_schedule(t1):
     def inner(step):
-        return t1 / (step+1)
+        return t1 / (step + 1)
+
     return inner
 
 
@@ -73,11 +140,10 @@ def transform_rc(rc):
 
 def relative_contrast_scorer(index, distance_metric, k):
     def inner(x):
-        distances = utils.compute_distances(
-            x, None, distance_metric, index
-        )[0, :]
+        distances = utils.compute_distances(x, None, distance_metric, index)[0, :]
         rc = dm.compute_rc(distances, k, scale="linear")
         return transform_rc(rc)
+
     return inner
 
 
@@ -87,6 +153,7 @@ def neighbor_generator_angular(scale, rng):
         neighbor = x + offset
         neighbor /= np.linalg.norm(neighbor)
         return neighbor
+
     return inner
 
 
@@ -95,6 +162,7 @@ def neighbor_generator_euclidean(scale, rng):
         offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
         neighbor = x + offset
         return neighbor
+
     return inner
 
 
@@ -423,6 +491,41 @@ def generate_workload(
     write_queries_hdf5(queries, queries_output)
 
 
+def generate_workload_annealing(
+    dataset_input,
+    queries_output,
+    k,
+    metric,
+    target_low,
+    target_high,
+    num_queries,
+    initial_temperature=1,
+    scale=10,
+    max_steps=300,
+    seed=1234,
+    threads=os.cpu_count()
+):
+    dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
+    print("loaded dataset with shape", dataset.shape)
+
+    queries = generate_queries_annealing(
+        dataset,
+        distance_metric,
+        k,
+        metric,
+        target_low,
+        target_high,
+        num_queries,
+        scale,
+        max_steps,
+        initial_temperature,
+        seed,
+        threads
+    )
+
+    write_queries_hdf5(queries, queries_output)
+
+
 
 def main():
     import argparse
@@ -511,6 +614,20 @@ def main_annealing():
         "--scale", type=float, required=False, default=10.0, help="Noise scale"
     )
     parser.add_argument(
+        "--initial_temperature",
+        type=float,
+        required=False,
+        default=10.0,
+        help="initial temperature for the simulated annealing process",
+    )
+    parser.add_argument(
+        "--num-queries",
+        type=int,
+        required=False,
+        default=10.0,
+        help="how many queries to generate",
+    )
+    parser.add_argument(
         "--max-steps",
         type=int,
         required=False,
@@ -523,47 +640,23 @@ def main_annealing():
 
     args = parser.parse_args()
 
-    gen = np.random.default_rng(args.seed)
-
     dataset, distance_metric = read_data.read_hdf5(args.dataset, "train")
     print("loaded dataset with shape", dataset.shape)
 
-    index = faiss.IndexFlatL2(dataset.shape[1])
-    index.add(dataset)
-
-    neighbor_generators = {
-        "angular": neighbor_generator_angular(args.scale, gen),
-        "euclidean": neighbor_generator_euclidean(args.scale, gen)
-    }
-    gen_neighbor = neighbor_generators[distance_metric]
-
-    scoring_functions = {
-        "rc": relative_contrast_scorer(index, distance_metric, args.k)
-    }
-    score = scoring_functions[args.metric]
-
-    score_transforms = {
-        "rc": transform_rc
-    }
-    score_transform = score_transforms[args.metric]
-    target_low = score_transform(args.target_low)
-    target_high = score_transform(args.target_high)
-
-    num_queries = 1
-    starting_ids = gen.choice(
-        np.arange(dataset.shape[0]), size=num_queries, replace=False
+    generate_queries_annealing(
+        dataset,
+        distance_metric,
+        args.k,
+        args.metric,
+        args.target_low,
+        args.target_high,
+        args.num_queries,
+        args.scale,
+        args.max_steps,
+        10,
+        args.seed,
     )
 
-    q = annealing(
-        score,
-        dataset[starting_ids[0],:],
-        gen_neighbor,
-        target_low,
-        target_high,
-        fast_annealing_schedule(10.0),
-        max_steps = args.max_steps
-    )
 
 if __name__ == "__main__":
     main_annealing()
-    

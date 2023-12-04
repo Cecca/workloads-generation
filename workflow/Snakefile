@@ -149,12 +149,12 @@ rule generate_rc:
         ".data/{dataset}.hdf5"
     output:
         f".generated/{paramspace.wildcard_pattern}.hdf5",
-    threads: workflow.cores / 2
+    threads: workflow.cores
     params:
         paramspace.instance
     run:
         import generate
-        generate.generate_workload(
+        generate.generate_workload_annealing(
           input[0],
           output[0],
           k = int(wildcards['k']),
@@ -163,7 +163,9 @@ rule generate_rc:
           target_high = float(wildcards['target_upper']),
           num_queries = int(wildcards['num_queries']),
           scale = float(wildcards['scale']),
-          probes = int(wildcards['nprobes'])
+          initial_temperature = int(wildcards['initial_temperature']),
+          max_steps = 10000,
+          threads = threads
         )
 
 

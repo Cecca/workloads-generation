@@ -4,22 +4,18 @@ from snakemake.utils import Paramspace
 def setup_param_space():
     datasets = [
         "fashion-mnist-784-euclidean",
-        "glove-100-angular",
-        #"glove-25-angular",
-        #"glove-200-angular",
-        # "mnist-784-euclidean",
-        #"sift-128-euclidean"
+        # "glove-100-angular",
     ]
     target_difficulty = {
         "rc": {
             "fashion-mnist-784-euclidean": [
                 (2.05, 1.95),
                 (1.55, 1.45),
-                (1.25, 1.15),
-                (1.05, 1.01),
+                (1.25, 1.15)
+                # (1.05, 1.01),
             ],
             "glove-100-angular": [
-                (2.05, 1.95)
+                # (2.05, 1.95)
                 #(1.55, 1.45)
             ]
         }
@@ -32,8 +28,8 @@ def setup_param_space():
         "fashion-mnist-784-euclidean": [10],
         "glove-100-angular": [0.1] 
     }
-    nprobes = {
-        "fashion-mnist-784-euclidean": [8],
+    initial_temperature = {
+        "fashion-mnist-784-euclidean": [10],
         "glove-100-angular": [1]
     }
     ks = [10]
@@ -47,7 +43,7 @@ def setup_param_space():
                 if dataset in target_difficulty[tf]:
                     for lower, upper in target_difficulty[tf][dataset]:
                         for s in scale[dataset]:
-                            for nps in nprobes[dataset]:
+                            for temp in initial_temperature[dataset]:
                                 configs.append({
                                     "dataset": dataset,
                                     "k": k,
@@ -56,7 +52,7 @@ def setup_param_space():
                                     "target_lower": lower,
                                     "target_upper": upper,
                                     "scale": s,
-                                    "nprobes": nps
+                                    "initial_temperature": temp
                                 })
     return Paramspace(pd.DataFrame(configs))
 
