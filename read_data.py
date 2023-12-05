@@ -6,7 +6,8 @@ from utils import compute_distances
 import sys
 
 dataset_path="/data/qwang/datasets/"
-noise_q_path="/mnt/hddhelp/ts_benchmarks/datasets/workloads_karima/sald/"
+sald_noise_path="/mnt/hddhelp/ts_benchmarks/datasets/sald/"
+glove_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/"
 
 DATASETS = {
 "astro": f"{dataset_path}astro-256-100m.bin",
@@ -21,7 +22,8 @@ DATASETS = {
 "glove-25": "glove-25-angular.hdf5",
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
-"sift": "sift-128-euclidean.hdf5"
+"sift": "sift-128-euclidean.hdf5",
+"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin"
 }
 
 WORKLOADS = {
@@ -32,10 +34,9 @@ WORKLOADS = {
 "rw": f"{dataset_path}rw-256-1k.bin", 
 "seismic": f"{dataset_path}seismic-256-1k.bin",
 "sald": f"{dataset_path}sald-128-1k.bin",
-"sald-noise-50": f"{noise_q_path}sald-128-10k-hard50p-znorm.bin",
-"sald-noise-30": f"{noise_q_path}sald-128-10k-hard30p-znorm.bin",
-"sald-noise-10": f"{noise_q_path}sald-128-10k-hard10p-znorm.bin",
-"sald-noise-1": f"{noise_q_path}sald-128-10k-hard1p-znorm.bin",
+"sald-noise-50": f"{sald_noise_path}sald-128-1k-hard50p.bin",
+"sald-noise-30": f"{sald_noise_path}sald-128-1k-hard30p.bin",
+"sald-noise-10": f"{sald_noise_path}sald-128-1k-hard10p.bin",
 "fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
 "glove-100": "glove-100-angular.hdf5",
 "glove-25": "glove-25-angular.hdf5",
@@ -54,6 +55,10 @@ WORKLOADS = {
 "sift-rc1.04": "sift-rc1.04.hdf5",
 "sift-rc1.02": "sift-rc1.02.hdf5",
 "sift-rc3": "sift-rc3.hdf5",
+"glove-noise-0": f"{glove_noise_path}glove-100-10k-hard0p-angular.bin",
+"glove-noise-10": f"{glove_noise_path}glove-100-10k-hard10p-angular.bin",
+"glove-noise-30": f"{glove_noise_path}glove-100-10k-hard30p-angular.bin",
+"glove-noise-50": f"{glove_noise_path}glove-100-10k-hard50p-angular.bin"
 }
 
 
@@ -173,7 +178,8 @@ def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
         queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)
         
         distance_metric = "euclidean"
-        distances = compute_distances(queries, 100, distance_metric, dataset)
+        # distances = compute_distances(queries, 100, distance_metric, dataset)
+        distances = None
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit()
