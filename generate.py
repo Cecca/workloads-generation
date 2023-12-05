@@ -24,7 +24,7 @@ def generate_queries_annealing(
     max_steps=10000,
     initial_temperature=10,
     seed=1234,
-    threads = os.cpu_count()
+    threads=os.cpu_count(),
 ):
     gen = np.random.default_rng(seed)
 
@@ -37,10 +37,13 @@ def generate_queries_annealing(
     }
     gen_neighbor = neighbor_generators[distance_metric]
 
-    scoring_functions = {"rc": relative_contrast_scorer(index, distance_metric, k)}
+    scoring_functions = {
+        "rc": relative_contrast_scorer(index, distance_metric, k),
+        "faiss_ivf": faiss_ivf_scorer(index, dataset, distance_metric, k),
+    }
     score = scoring_functions[metric]
 
-    score_transforms = {"rc": transform_rc}
+    score_transforms = {"rc": transform_rc, "faiss_ivf": lambda s: s}
     score_transform = score_transforms[metric]
     target_low = score_transform(target_low)
     target_high = score_transform(target_high)
@@ -111,6 +114,7 @@ def annealing(
         elif y <= y_next <= target_low or target_high <= y_next <= y:
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
+            print("new score", y)
         else:
             # we pick the neighbor by the Metropolis criterion
             delta = abs(y - y_next)
@@ -118,6 +122,7 @@ def annealing(
             p = exp(-delta / t)
             if random.random() < p:
                 x, y = x_next, y_next
+                print("new score", y)
             pass
 
     raise Exception("Could not find point in the desired range")
@@ -143,6 +148,39 @@ def relative_contrast_scorer(index, distance_metric, k):
         distances = utils.compute_distances(x, None, distance_metric, index)[0, :]
         rc = dm.compute_rc(distances, k, scale="linear")
         return transform_rc(rc)
+
+    return inner
+
+
+def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_list=None):
+    """
+    Score a point by the fraction of distance computations (wrt to the total) that the
+    faiss ivf index has to do to reach a given target recall.
+    """
+    if n_list is None:
+        n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+    quantizer = faiss.IndexFlatL2(dataset.shape[1])
+    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+    index.train(dataset)
+    index.add(dataset)
+
+    def inner(x):
+        distances = utils.compute_distances(x, None, distance_metric, exact_index)[0, :]
+        for nprobe in range(1, 1000):
+            faiss.cvar.indexIVF_stats.reset()
+            index.nprobe = nprobe
+            run_dists = utils.compute_distances(x, k, distance_metric, index)[0]
+
+            rec = utils.compute_recall(distances, run_dists, k)
+            if rec >= recall:
+                distcomp = (
+                    faiss.cvar.indexIVF_stats.ndis
+                    + faiss.cvar.indexIVF_stats.nq * n_list
+                )
+                print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
+                return distcomp / index.ntotal
+
+        return 1
 
     return inner
 
@@ -503,7 +541,7 @@ def generate_workload_annealing(
     scale=10,
     max_steps=300,
     seed=1234,
-    threads=os.cpu_count()
+    threads=os.cpu_count(),
 ):
     dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
@@ -520,11 +558,10 @@ def generate_workload_annealing(
         max_steps,
         initial_temperature,
         seed,
-        threads
+        threads,
     )
 
     write_queries_hdf5(queries, queries_output)
-
 
 
 def main():
