@@ -78,14 +78,15 @@ rule plot_synthetic_difficulty:
         import pandas as pd
 
         df = pd.read_csv(input["metrics"])
-        df["target_rc"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
-        averages = df.groupby(["dataset", "target_rc"]).mean().reset_index()
+        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
+        averages = df.groupby(["dataset", "target", "target_metric"]).mean().reset_index()
+        print(averages)
 
         (
-          so.Plot(df, x="rc_10", y="distcomp", color="target_rc")
+          so.Plot(df, x="rc_10", y="distcomp", color="target")
             .facet("dataset")
             .add(so.Dot())
-            .add(so.Dot(color="black"), data=averages)
+            #.add(so.Dot(color="black"), data=averages)
             .save(output[0])
         )
 
@@ -144,7 +145,7 @@ rule synthetic_metrics:
 
 # Here we generate syntehtic query sets, guided by the
 # relative contrast metric
-rule generate_rc:
+rule generate_synthetic:
     input:
         ".data/{dataset}.hdf5"
     output:
@@ -154,6 +155,8 @@ rule generate_rc:
         paramspace.instance
     run:
         import generate
+        import logging
+        logging.basicConfig(level=logging.INFO)
         generate.generate_workload_annealing(
           input[0],
           output[0],
@@ -186,8 +189,8 @@ rule eval_metrics:
           input['queries'],
           output[0],
           int(wildcards['k']),
-          additional_header = ["dataset", "target_low", "target_high"],
-          additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper'])]
+          additional_header = ["dataset", "target_low", "target_high", "target_metric"],
+          additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
         )
 
 ################################################################################

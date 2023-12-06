@@ -10,6 +10,8 @@ import faiss
 import utils
 import time
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+import logging
 
 
 def generate_queries_annealing(
@@ -54,20 +56,27 @@ def generate_queries_annealing(
     print(starting_ids)
 
     with ThreadPoolExecutor(threads) as pool:
-        queries = list(
-            pool.map(
-                lambda x: annealing(
-                    score,
-                    dataset[x, :],
-                    gen_neighbor,
-                    target_low,
-                    target_high,
-                    fast_annealing_schedule(initial_temperature),
-                    max_steps=max_steps,
-                ),
-                starting_ids,
-            )
-        )
+        tasks = {
+            pool.submit(
+                annealing, 
+                score,
+                dataset[x, :],
+                gen_neighbor,
+                target_low,
+                target_high,
+                fast_annealing_schedule(initial_temperature),
+                max_steps=max_steps
+            ): x
+            for x in starting_ids
+        }
+        queries = []
+        for future in tasks:
+            try:
+                query = future.result()
+            except Exception as exc:
+                logging.error("Error in generating query from %d" % tasks[future])
+            else:
+                queries.append(query)
     queries = np.vstack(queries)
     return queries
 
@@ -99,22 +108,35 @@ def annealing(
 
     assert target_low <= target_high
     x, y = start_point, score(start_point)
-    print("start from score", y)
-    if y > target_low:
-        print("point is already in the desired range")
-        # FIXME: find out how to efficiently navigate towards easier points
+    x_best, y_best = x, y
+    y_start = y
+    logging.info("start from score %f", y)
+    if target_low <= y <= target_high:
+        logging.info("point is already in the desired range")
         return x
 
+    steps_since_last_improvement = 0
+    steps_threshold = max(max_steps // 100, 10)
+    logging.debug("steps threshold %d", steps_threshold)
+
     for step in range(max_steps):
+        if steps_since_last_improvement >= steps_threshold:
+            logging.debug("moving back to the previous best due to lack of improvement")
+            x, y = x_best, y_best
+            steps_since_last_improvement = 0
+
         x_next = gen_neighbor(x)
         y_next = score(x_next)
+        # FIXME: handle case of navigating towards easier points
         if target_low <= y_next <= target_high:
-            print("Returning query point with score", y_next)
+            logging.info("Returning query point with score %f", y_next)
             return x_next
         elif y <= y_next <= target_low or target_high <= y_next <= y:
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
-            print("new score", y)
+            logging.debug("new best score %f", y)
+            x_best, y_best  = x, y
+            steps_since_last_improvement = 0
         else:
             # we pick the neighbor by the Metropolis criterion
             delta = abs(y - y_next)
@@ -122,10 +144,10 @@ def annealing(
             p = exp(-delta / t)
             if random.random() < p:
                 x, y = x_next, y_next
-                print("new score", y)
-            pass
+                logging.debug("new score %f temperature %f (%d since last improvement, p=%f, delta=%f)", y, t, steps_since_last_improvement, p, delta)
+            steps_since_last_improvement += 1
 
-    raise Exception("Could not find point in the desired range")
+    raise Exception("Could not find point in the desired range, started from %s" % y_start)
 
 
 def fast_annealing_schedule(t1):
@@ -159,25 +181,31 @@ def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_l
     """
     if n_list is None:
         n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+        print("Using n_list=", n_list)
     quantizer = faiss.IndexFlatL2(dataset.shape[1])
     index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
     index.train(dataset)
     index.add(dataset)
 
+    lock = Lock()
+
     def inner(x):
         distances = utils.compute_distances(x, None, distance_metric, exact_index)[0, :]
         for nprobe in range(1, 1000):
-            faiss.cvar.indexIVF_stats.reset()
-            index.nprobe = nprobe
-            run_dists = utils.compute_distances(x, k, distance_metric, index)[0]
-
-            rec = utils.compute_recall(distances, run_dists, k)
-            if rec >= recall:
+            # we need to lock the execution because the statistics collection is
+            # not thread safe, in that it uses global variables.
+            with lock:
+                faiss.cvar.indexIVF_stats.reset()
+                index.nprobe = nprobe
+                run_dists = utils.compute_distances(x, k, distance_metric, index)[0]
                 distcomp = (
                     faiss.cvar.indexIVF_stats.ndis
                     + faiss.cvar.indexIVF_stats.nq * n_list
                 )
-                print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
+
+            rec = utils.compute_recall(distances, run_dists, k)
+            if rec >= recall:
+                # print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
                 return distcomp / index.ntotal
 
         return 1
@@ -631,6 +659,8 @@ def write_queries_hdf5(queries, path):
 
 def main_annealing():
     import argparse
+
+    logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True, help="Path to the dataset file")
