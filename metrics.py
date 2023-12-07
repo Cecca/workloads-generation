@@ -135,9 +135,8 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
                 q_dists = q_distances
 
                 rec = compute_recall(q_dists, run_dists, k)
-                print(rec)
                 if rec >= target_recall:
-                    distcomp = faiss.cvar.indexIVF_stats.ndis + + faiss.cvar.indexIVF_stats.nq * n_list
+                    distcomp = faiss.cvar.indexIVF_stats.ndis + faiss.cvar.indexIVF_stats.nq * n_list
                     break
 
             assert distcomp is not None
