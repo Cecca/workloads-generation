@@ -191,7 +191,7 @@ def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_l
 
     def inner(x):
         distances = utils.compute_distances(x, None, distance_metric, exact_index)[0, :]
-        for nprobe in range(1, 1000):
+        for nprobe in range(1, n_list):
             # we need to lock the execution because the statistics collection is
             # not thread safe, in that it uses global variables.
             with lock:
@@ -208,7 +208,7 @@ def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_l
                 # print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
                 return distcomp / index.ntotal
 
-        return 1
+        raise Exception("Could not get the desired recall, even visiting the entire dataset")
 
     return inner
 

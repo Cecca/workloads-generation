@@ -124,7 +124,7 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
             # qq = np.array([query]) # just to comply with faiss API
             distcomp = None
             elapsed = None
-            for nprobe in range(1,1000):
+            for nprobe in range(1, n_list):
                 faiss.cvar.indexIVF_stats.reset()
                 index.nprobe = nprobe
                 tstart = time.time()
