@@ -83,7 +83,7 @@ rule plot_synthetic_difficulty:
         print(averages)
 
         (
-          so.Plot(df, x="rc_10", y="distcomp", color="target")
+          so.Plot(df, y="rc_10", x="distcomp", color="target")
             .facet("dataset")
             .add(so.Dot())
             #.add(so.Dot(color="black"), data=averages)

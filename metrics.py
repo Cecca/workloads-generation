@@ -95,9 +95,10 @@ def build_index(dataset, n_list, distance_metric):
 def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[]):
     assert len( additional_header ) == len(additional_row)
     dataset, distance_metric = rd.read_hdf5(dataset_path, "train")
+    n = dataset.shape[0]
     queries, _ = rd.read_hdf5(queries_path, "test")
 
-    n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+    n_list = int(np.ceil(np.sqrt(n)))
     index = build_index(dataset, n_list, distance_metric)
 
     with open(output_path, "w", newline="") as fp:
@@ -140,7 +141,7 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
                     break
 
             assert distcomp is not None
-            row.extend([distcomp, rec, elapsed])
+            row.extend([distcomp / n, rec, elapsed])
             row.extend(additional_row)
 
             writer.writerow(row)

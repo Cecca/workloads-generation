@@ -131,7 +131,8 @@ def annealing(
         if target_low <= y_next <= target_high:
             logging.info("Returning query point with score %f", y_next)
             return x_next
-        elif y <= y_next <= target_low or target_high <= y_next <= y:
+        # elif y <= y_next <= target_low or target_high <= y_next <= y:
+        elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(abs(y - target_low), abs(y - target_high)):
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
             logging.debug("new best score %f", y)
@@ -660,7 +661,7 @@ def write_queries_hdf5(queries, path):
 def main_annealing():
     import argparse
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True, help="Path to the dataset file")
