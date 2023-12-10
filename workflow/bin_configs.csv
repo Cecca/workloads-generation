@@ -1,0 +1,5 @@
+c1,c2,c3,c4
+1,/data/qwang/datasets/sald-128-100m.bin,/mnt/hddhelp/ts_benchmarks/datasets/sald/sald-128-1k.bin,128
+2,/data/qwang/datasets/sald-128-100m.bin,/mnt/hddhelp/ts_benchmarks/datasets/sald/sald-128-1k-hard50p.bin,128
+3,/data/qwang/datasets/sald-128-100m.bin,/mnt/hddhelp/ts_benchmarks/datasets/sald/sald-128-1k-hard30p.bin,128
+4,/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/glove-100-1183514-angular.bin,/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/glove-100-10k-hard0p-angular.bin,100

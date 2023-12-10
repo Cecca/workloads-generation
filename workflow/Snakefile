@@ -59,7 +59,7 @@ print(paramspace.dataframe)
 # For convenience, here we extract the set of datasets we
 # use in this evaluation.
 DATASETS = set(paramspace.dataframe['dataset'])
-
+BIN_CONFIGS = pd.read_csv("bin_configs.csv")['c1'].values
 
 # This rule plots the number of distance computations against
 # the RC metric for different datasets, coloring points
@@ -256,3 +256,43 @@ rule prepare_data_file:
         import read_data
         name = wildcards["name"]
         read_data.download(f"https://ann-benchmarks.com/{name}.hdf5", output[0])
+
+rule run_messi_one:
+	output:
+		"messi_results_config{index}.txt"
+	run:
+		import os
+		df = pd.read_csv("bin_configs.csv")
+		row = wildcards.get('index')
+		dsfile = df.query('c1=='+row)['c2'].values[0]
+		queryfile = df.query('c1=='+row)['c3'].values[0]
+		slength=str(df.query('c1=='+row)['c4'].values[0])
+		print(slength)
+		shelline = '/home/qwang/projects/isax-modularized/build/isax --database_filepath='+dsfile+' --query_filepath='+queryfile+' --database_size=1000000 --query_size=1000 --sax_length=16 --sax_cardinality=8 --cpu_cores=4 --log_filepath=messi'+str(row)+'.log --series_length='+slength+' --adhoc_breakpoints --leaf_size=10000 --k=1 --with_id'
+		print(shelline)
+		os.system(shelline)
+		shelline = 'echo '+row+' >messi_results_config'+row+'.txt'
+		#print(shelline)
+		os.system(shelline)
+		shelline = 'grep "1NN" messi'+str(row)+'.log | xargs -I{} echo {} | grep -oP "by\s+\K\w+" >> messi_results_config'+row+'.txt'
+		os.system(shelline)
+		shelline="sed -i '1002,$ d' "+"messi_results_config"+row+".txt"
+		os.system(shelline)
+
+	
+rule run_messi_all:
+	input:
+		expand("messi_results_config{index}.txt", index = BIN_CONFIGS)		
+	output:
+		"messi_all.csv"
+	run:
+		for f in input:
+			print(pd.read_csv(f))
+		df = pd.concat((pd.read_csv(f) for f in input), axis=1)
+		print(df)
+		df.to_csv(output[0], index=False)
+		
+		
+		
+		
+	
