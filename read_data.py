@@ -96,40 +96,53 @@ def read_hdf5(filename, what, limit=None):
     return data, distance_metric
 
 
-
-# def read_from_hdf5(filename, data_limit=None, query_limit=None):
-#     with h5py.File(filename) as hfp:
-#         distance_metric = hfp.attrs['distance']
-#
-#         if query_limit is not None:
-#             queries = hfp['test'][:query_limit]
-#         else:
-#             queries = hfp['test'][:]
-#
-#         if data_limit is not None:
-#             dataset = hfp['train'][:data_limit]
-#             # We have to recompute the distances, because the `distances`
-#             # matrix stored in the hdf5 file is relative to the _entire_
-#             # dataset, not parts of it
-#             print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
-#             if distance_metric == "angular":
-#                 dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-#                 queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-#             distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ? 
-#         else:
-#             dataset = hfp['train'][:]
-#             distances = hfp['distances'][:]
-#
-#     return dataset, queries, distances, distance_metric
-
 def read_from_txt(filename):
     data = np.loadtxt(filename)
     return data
 
+
 def read_from_bin(filename, sids, sdim):
     data = np.fromfile(filename, dtype=np.float32)
-
     return data.reshape(sids,sdim)
+
+
+def read_multiformat(name, what, data_limit=None):
+    if not os.path.isfile(name):
+        if what == "train":
+            path = DATASETS[name]
+        elif what == "test":
+            path = WORKLOADS[name]
+        else:
+            raise Exception("`what` can only be one of `train` or `test`")
+    else:
+        path = name
+
+    if path.endswith('.txt'):
+        data = read_from_txt(path)
+        if data_limit is not None:
+            data = data[:data_limit, :]
+        distance_metric = "euclidean"
+    elif path.endswith('.hdf5'):
+        if not os.path.isfile(path):
+            _download_ann_benchmarks(path)
+        data, distance_metric = read_hdf5(path, "train", data_limit)
+    elif path.endswith(".bin"):
+        data_samples, data_features = parse_filename(path)
+
+        if data_limit is None:
+            data_limit = data_samples
+
+        data = np.fromfile(path, dtype='float32', count=data_features*data_limit).reshape(data_limit, data_features)
+        distance_metric = "euclidean"
+    else:
+        print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
+        sys.exit()
+
+    if distance_metric == "angular":
+        data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
+
+    return data, distance_metric
+
 
 def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
     data_path = DATASETS[dataset_name]
