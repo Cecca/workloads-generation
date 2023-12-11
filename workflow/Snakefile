@@ -80,7 +80,7 @@ rule plot_synthetic_difficulty:
         df = pd.read_csv(input["metrics"])
         df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
         averages = df.groupby(["dataset", "target", "target_metric"]).mean().reset_index()
-        print(averages)
+        print(averages[["dataset", "target", "distcomp", "rc_10", "lid_10"]])
 
         (
           so.Plot(df, y="rc_10", x="distcomp", color="target")
