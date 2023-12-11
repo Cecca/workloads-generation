@@ -203,7 +203,7 @@ def partition_by(candidates, fun):
     return cur_res
 
 
-def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_list=None):
+def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.99, n_list=None):
     """
     Score a point by the fraction of distance computations (wrt to the total) that the
     faiss ivf index has to do to reach a given target recall.
