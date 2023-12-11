@@ -239,7 +239,7 @@ rule umap_embedding:
         import pickle
         import gzip
         embedder = umap.UMAP()
-        dataset, _ = read_data.read_hdf5(input[0], "train")
+        dataset, _ = read_data.read_multiformat(input[0], "train")
         embedding = embedder.fit_transform(dataset)
         with h5py.File(output["embedding"], "w") as hfp:
             hfp["train"] = embedding

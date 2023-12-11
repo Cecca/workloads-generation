@@ -524,7 +524,7 @@ def generate_workload(
     max_steps=300,
     seed=1234,
 ):
-    dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded", dataset.shape)
     if distance_metric == "angular":
         walker_class = RandomWalkAngular
@@ -574,7 +574,7 @@ def generate_workload_annealing(
     seed=1234,
     threads=os.cpu_count(),
 ):
-    dataset, distance_metric = read_data.read_hdf5(dataset_input, "train")
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
 
     queries = generate_queries_annealing(
@@ -710,7 +710,7 @@ def main_annealing():
 
     args = parser.parse_args()
 
-    dataset, distance_metric = read_data.read_hdf5(args.dataset, "train")
+    dataset, distance_metric = read_data.read_multiformat(args.dataset, "train")
     print("loaded dataset with shape", dataset.shape)
 
     generate_queries_annealing(

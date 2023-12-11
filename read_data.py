@@ -125,7 +125,7 @@ def read_multiformat(name, what, data_limit=None):
     elif path.endswith('.hdf5'):
         if not os.path.isfile(path):
             _download_ann_benchmarks(path)
-        data, distance_metric = read_hdf5(path, "train", data_limit)
+        data, distance_metric = read_hdf5(path, what, data_limit)
     elif path.endswith(".bin"):
         data_samples, data_features = parse_filename(path)
 

@@ -148,7 +148,7 @@ class EmpiricalDifficultyIVF(object):
             if not os.path.isdir(".index-cache"):
                 os.mkdir(".index-cache")
             quantizer = faiss.IndexFlatL2(dataset.shape[1])
-            index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+            index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], self.n_list, faiss.METRIC_L2)
             index.train(dataset)
             index.add(dataset)
             faiss.write_index(index, faiss.FileIOWriter(fname))
@@ -197,9 +197,9 @@ class EmpiricalDifficultyIVF(object):
 
 def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[]):
     assert len( additional_header ) == len(additional_row)
-    dataset, distance_metric = rd.read_hdf5(dataset_path, "train")
+    dataset, distance_metric = rd.read_multiformat(dataset_path, "train")
     n = dataset.shape[0]
-    queries, _ = rd.read_hdf5(queries_path, "test")
+    queries, _ = rd.read_multiformat(queries_path, "test")
 
     # n_list = int(np.ceil(np.sqrt(n)))
     # index = build_index(dataset, n_list, distance_metric)
@@ -260,7 +260,8 @@ if __name__ == "__main__":
         print("Usage: python metrics.py dataset_file query_file k [optional:epsilon as list with spaces] [optional:data_limit] [optional:query_limit]")
         sys.exit(1)
     
-    dataset, queries, distances, distance_metric = rd.read_data(dataset_name, queryset_name, data_limit, query_limit)
+    dataset, distance_metric = rd.read_multiformat(dataset_name, "train", data_limit)
+    queries, _ = rd.read_multiformat(queryset_name, "test", query_limit)
     print("Loaded dataset with {} points, and queryset with {} queries".format(dataset.shape, queries.shape))
 
     # epsilons = None
@@ -327,10 +328,7 @@ if __name__ == "__main__":
                 run_dists = compute_distances(query, k_value, distance_metric, index)
                 tend = time.time()
                 elapsed = tend - tstart
-                if distances is not None:
-                    q_dists =  distances[i,:]
-                else:
-                    q_dists = q_distances[:100]
+                q_dists = q_distances[:k_value]
                 #debug    
                 if flag:
                     print(f"run_dist: {run_dists} \n q_dist {q_dists}")
