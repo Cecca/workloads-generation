@@ -107,6 +107,17 @@ def read_from_bin(filename, sids, sdim):
 
 
 def read_multiformat(name, what, data_limit=None):
+    """
+    Reads a (data or query) file with the given name. If the name does not correspond to an
+    existing file, then a corresponding file is looked in the DATASETS or WORKLOADS dictionaries.
+
+    ## Parameters
+
+    :name: path or name of the data/queryset to load
+    :what: whether to load the `train` or `test` set from the file (only 
+           works for HDF5 files)
+    :data_limit: only load the first `data_limit` points from the file
+    """
     if not os.path.isfile(name):
         if what == "train":
             path = DATASETS[name]
@@ -144,65 +155,6 @@ def read_multiformat(name, what, data_limit=None):
     return data, distance_metric
 
 
-def read_data(dataset_name, queryset_name, data_limit=None, query_limit=None):
-    data_path = DATASETS[dataset_name]
-    query_path = WORKLOADS[queryset_name]
-
-    data_samples, data_features = 0, 0
-
-    # Read dataset and query based on file extension
-    if data_path.endswith('.txt') and query_path.endswith('.txt'):
-        dataset = read_from_txt(data_path)
-        queries = read_from_txt(query_path)
-        distance_metric = "euclidean"
-        distances = compute_distances(queries, 100, distance_metric, dataset)
-    elif data_path.endswith('.hdf5'):
-        _download_ann_benchmarks(data_path)
-        _download_ann_benchmarks(query_path)
-        dataset, distance_metric = read_hdf5(data_path, "train", data_limit)
-        queries, _ = read_hdf5(query_path, "test", query_limit)
-        if data_limit is not None or data_path != query_path:
-            # We have to recompute the distances, because the `distances`
-            # matrix stored in the hdf5 file is relative to the _entire_
-            # dataset, not parts of it
-            print("WARNING: Computing ground truth distances on the fly, because we are using the `data_limit` parameter")
-            if distance_metric == "angular":
-                dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-                queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-            distances = compute_distances(queries, 100, distance_metric, dataset) # if we have k>100 ?
-        else:
-            print("data_path", data_path)
-            print("query_path", query_path)
-            distances, _ = read_hdf5(data_path, "distances", query_limit)
-    elif data_path.endswith('.bin'):
-        data_samples, data_features = parse_filename(data_path)
-        query_samples, query_features = parse_filename(query_path)
-
-        # assert data_limit is not None
-        # assert query_limit is not None
-        assert data_features == query_features
-
-        if data_limit is None:
-            data_limit = data_samples
-        if query_limit is None:
-            query_limit = query_samples
-
-        dataset = np.fromfile(data_path, dtype='float32', count=data_features*data_limit).reshape(data_limit, data_features)
-        queries = np.fromfile(query_path, dtype='float32', count=query_features*query_limit).reshape(query_limit, query_features)
-        
-        distance_metric = "euclidean"
-        # distances = compute_distances(queries, 100, distance_metric, dataset)
-        distances = None
-    else:
-        print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
-        sys.exit()
-
-    if distance_metric == "angular":
-        dataset = dataset / np.linalg.norm(dataset, axis=1)[:, np.newaxis]
-        queries = queries / np.linalg.norm(queries, axis=1)[:, np.newaxis]
-
-    return dataset, queries, distances, distance_metric
-
 def str_to_digits(sids_str):
     num_map = {'K':1000, 'M':1000000, 'B':1000000000}
     sids = 0
@@ -211,6 +163,7 @@ def str_to_digits(sids_str):
     else:
         sids = int(float(sids_str[:-1]) * num_map.get(sids_str[-1].upper(), 1))
     return sids
+
 
 def parse_filename(filepath):   
     # parse sdim and sids /path/to/file/deep1b-96-1k.bin
@@ -221,53 +174,4 @@ def parse_filename(filepath):
 
     return samples, features
 
-
-# Test a few things
-if __name__ == "__main__":
-    # Here we check that the distance-computing function makes sense.
-    import faiss
-    from utils import compute_recall
-    import time
-
-    dataset_name = "glove-100"
-    dataset, queries, distances, distance_metric = read_data(
-        dataset_name, dataset_name, data_limit=None, query_limit=16)
-
-    k = 10
-
-    # Check that the brute force distance computation is correct
-    start = time.time()
-    dists = compute_distances(queries, k, distance_metric, dataset)
-    end = time.time()
-    ground = distances[:len(dists), :k]
-    assert np.allclose(dists, ground)
-    print("Exact search all OK:", end - start, "seconds")
-
-    # Check FAISS exact index
-    index = faiss.IndexFlatL2(dataset.shape[1])
-    index.add(dataset)
-    start = time.time()
-    dists = compute_distances(queries, k, distance_metric, index)
-    end = time.time()
-    ground = distances[:len(dists), :k]
-    assert np.allclose(dists, ground)
-    print("FAISS exact search all OK:", end - start, "seconds")
-    
-    # Check that the approximate distance computation gives a reasonable recall
-    n_list = 32
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    index.nprobe = 32
-    start = time.time()
-    dists = compute_distances(queries, k, distance_metric, index)
-    ground = distances[:len(dists), :k]
-    recalls = np.array([
-        compute_recall(g, d, k)
-        for g, d in zip(ground, dists)
-    ])
-    assert np.all(recalls >= 0.95)
-    end = time.time()
-    print("Approximate search all OK:", end - start, "seconds")
 
