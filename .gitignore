@@ -6,3 +6,4 @@ imgs
 /.data
 /results
 /.snakemake
+.index-cache

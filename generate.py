@@ -74,7 +74,7 @@ def generate_queries_annealing(
             try:
                 query = future.result()
             except Exception as exc:
-                logging.error("Error in generating query from %d" % tasks[future])
+                logging.error("Error in generating query from %d: %s\n%s" % (tasks[future], exc))
             else:
                 queries.append(query)
     queries = np.vstack(queries)
@@ -175,24 +175,74 @@ def relative_contrast_scorer(index, distance_metric, k):
     return inner
 
 
+def partition_by(candidates, fun):
+    # first do an exponential search
+    upper = 0
+    lower = 0
+    cur_res = None
+    while upper < len(candidates):
+        res = fun(candidates[upper])
+        if res is not None:
+            cur_res = res
+            break
+        lower = upper
+        upper = upper * 2 if upper > 0 else 1
+
+    # now we know that the predicate is satisfied between prev_ids (where it 
+    # is not satisfied) and cur_idx (where it is satisfied). So we do a binary search between the two
+    while lower < upper:
+        mid = (lower + upper) // 2
+        mid_res = fun(candidates[mid])
+        if mid_res is not None:
+            cur_res = mid_res
+            upper = mid
+        else:
+            lower = mid + 1
+
+    return cur_res
+
+
 def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_list=None):
     """
     Score a point by the fraction of distance computations (wrt to the total) that the
     faiss ivf index has to do to reach a given target recall.
     """
+    import hashlib
+
     if n_list is None:
         n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
         print("Using n_list=", n_list)
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
+
+    # we cache the index to a finle, whose name depends on the contents
+    # of the dataset and on the n_list parameter
+    sha = hashlib.new("sha256")
+    sha.update(dataset.tobytes())
+    sha = sha.hexdigest()
+    fname = f".index-cache/faiss-ivf-{n_list}-{sha}.bin"
+
+    if os.path.isfile(fname):
+        print("reading index from file")
+        index = faiss.read_index(faiss.FileIOReader(fname))
+    else:
+        print("Computing index")
+        if not os.path.isdir(".index-cache"):
+            os.mkdir(".index-cache")
+        quantizer = faiss.IndexFlatL2(dataset.shape[1])
+        index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+        index.train(dataset)
+        index.add(dataset)
+        faiss.write_index(index, faiss.FileIOWriter(fname))
 
     lock = Lock()
 
+
+
     def inner(x):
+        t_dists = time.time()
         distances = utils.compute_distances(x, None, distance_metric, exact_index)[0, :]
-        for nprobe in range(1, n_list):
+        t_dists = time.time() - t_dists
+        t_probe_start = time.time()
+        def tester(nprobe):
             # we need to lock the execution because the statistics collection is
             # not thread safe, in that it uses global variables.
             with lock:
@@ -207,9 +257,17 @@ def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_l
             rec = utils.compute_recall(distances, run_dists, k)
             if rec >= recall:
                 # print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
+                t_probe = time.time() - t_probe_start
+                print("nprobe", nprobe, "/", n_list, "time probing", t_probe, "time exact", t_dists)
                 return distcomp / index.ntotal
+            else:
+                return None
 
-        raise Exception("Could not get the desired recall, even visiting the entire dataset")
+        dist_frac = partition_by(list(range(1, n_list)), tester)
+        if dist_frac is not None:
+            return dist_frac
+        else:
+            raise Exception("Could not get the desired recall, even visiting the entire dataset")
 
     return inner
 
@@ -728,3 +786,4 @@ def main_annealing():
 
 if __name__ == "__main__":
     main_annealing()
+    
