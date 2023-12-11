@@ -155,6 +155,12 @@ def read_multiformat(name, what, data_limit=None):
     return data, distance_metric
 
 
+def hdf5_to_bin(input_path, output_path, what):
+    assert what in ["train", "test"]
+    data, _ = read_hdf5(input_path, what)
+    data.tofile(output_path)
+
+
 def str_to_digits(sids_str):
     num_map = {'K':1000, 'M':1000000, 'B':1000000000}
     sids = 0
