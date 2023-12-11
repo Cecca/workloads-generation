@@ -5,6 +5,7 @@ This module collects approaches to generate workloads for a given dataset.
 import os
 import numpy as np
 import dimensionality_measures as dm
+from metrics import EmpiricalDifficultyIVF
 import read_data
 import faiss
 import utils
@@ -207,67 +208,10 @@ def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.999, n_l
     Score a point by the fraction of distance computations (wrt to the total) that the
     faiss ivf index has to do to reach a given target recall.
     """
-    import hashlib
-
-    if n_list is None:
-        n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
-        print("Using n_list=", n_list)
-
-    # we cache the index to a finle, whose name depends on the contents
-    # of the dataset and on the n_list parameter
-    sha = hashlib.new("sha256")
-    sha.update(dataset.tobytes())
-    sha = sha.hexdigest()
-    fname = f".index-cache/faiss-ivf-{n_list}-{sha}.bin"
-
-    if os.path.isfile(fname):
-        print("reading index from file")
-        index = faiss.read_index(faiss.FileIOReader(fname))
-    else:
-        print("Computing index")
-        if not os.path.isdir(".index-cache"):
-            os.mkdir(".index-cache")
-        quantizer = faiss.IndexFlatL2(dataset.shape[1])
-        index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-        index.train(dataset)
-        index.add(dataset)
-        faiss.write_index(index, faiss.FileIOWriter(fname))
-
-    lock = Lock()
-
-
+    difficulty_ivf = EmpiricalDifficultyIVF(dataset, recall, exact_index, distance_metric)
 
     def inner(x):
-        t_dists = time.time()
-        distances = utils.compute_distances(x, None, distance_metric, exact_index)[0, :]
-        t_dists = time.time() - t_dists
-        t_probe_start = time.time()
-        def tester(nprobe):
-            # we need to lock the execution because the statistics collection is
-            # not thread safe, in that it uses global variables.
-            with lock:
-                faiss.cvar.indexIVF_stats.reset()
-                index.nprobe = nprobe
-                run_dists = utils.compute_distances(x, k, distance_metric, index)[0]
-                distcomp = (
-                    faiss.cvar.indexIVF_stats.ndis
-                    + faiss.cvar.indexIVF_stats.nq * n_list
-                )
-
-            rec = utils.compute_recall(distances, run_dists, k)
-            if rec >= recall:
-                # print("return nprobe", nprobe, "distcomp", distcomp, "recall", rec)
-                t_probe = time.time() - t_probe_start
-                print("nprobe", nprobe, "/", n_list, "time probing", t_probe, "time exact", t_dists)
-                return distcomp / index.ntotal
-            else:
-                return None
-
-        dist_frac = partition_by(list(range(1, n_list)), tester)
-        if dist_frac is not None:
-            return dist_frac
-        else:
-            raise Exception("Could not get the desired recall, even visiting the entire dataset")
+        return difficulty_ivf.evaluate(x, k)
 
     return inner
 

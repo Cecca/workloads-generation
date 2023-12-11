@@ -92,6 +92,105 @@ def build_index(dataset, n_list, distance_metric):
     return index
 
 
+def partition_by(candidates, fun):
+    # first do an exponential search
+    upper = 0
+    lower = 0
+    cur_res = None
+    while upper < len(candidates):
+        res = fun(candidates[upper])
+        if res is not None:
+            cur_res = res
+            break
+        lower = upper
+        upper = upper * 2 if upper > 0 else 1
+
+    # now we know that the predicate is satisfied between prev_ids (where it 
+    # is not satisfied) and cur_idx (where it is satisfied). So we do a binary search between the two
+    while lower < upper:
+        mid = (lower + upper) // 2
+        mid_res = fun(candidates[mid])
+        if mid_res is not None:
+            cur_res = mid_res
+            upper = mid
+        else:
+            lower = mid + 1
+
+    return cur_res
+
+
+class EmpiricalDifficultyIVF(object):
+    """
+    Stores (and possibly caches on a file) a FAISS-IVF index to evaluate the difficulty
+    of queries, using the number of computed distances as a proxy for the difficulty.
+    """
+
+    def __init__(self, dataset, recall, exact_index, distance_metric):
+        import hashlib
+        import os
+        import logging
+        from threading import Lock
+
+        self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+
+        # we cache the index to a finle, whose name depends on the contents
+        # of the dataset and on the n_list parameter
+        sha = hashlib.new("sha256")
+        sha.update(dataset.tobytes())
+        sha = sha.hexdigest()
+        fname = f".index-cache/faiss-ivf-{self.n_list}-{sha}.bin"
+
+        if os.path.isfile(fname):
+            logging.info("reading index from file")
+            index = faiss.read_index(faiss.FileIOReader(fname))
+        else:
+            logging.info("Computing index")
+            if not os.path.isdir(".index-cache"):
+                os.mkdir(".index-cache")
+            quantizer = faiss.IndexFlatL2(dataset.shape[1])
+            index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+            index.train(dataset)
+            index.add(dataset)
+            faiss.write_index(index, faiss.FileIOWriter(fname))
+
+        self.index = index
+        self.exact_index = exact_index
+        self.lock = Lock()
+        self.recall = recall
+        self.distance_metric = distance_metric
+            
+            
+    def evaluate(self, x, k):
+        """Evaluates the empirical difficulty of the given point `x` for the given `k`.
+        Returns the number of distance computations, scaled by the number of datasets."""
+        distances = compute_distances(x, None, self.distance_metric, self.exact_index)[0, :]
+
+        def tester(nprobe):
+            # we need to lock the execution because the statistics collection is
+            # not thread safe, in that it uses global variables.
+            with self.lock:
+                faiss.cvar.indexIVF_stats.reset()
+                self.index.nprobe = nprobe
+                run_dists = compute_distances(x, k, self.distance_metric, self.index)[0]
+                distcomp = (
+                    faiss.cvar.indexIVF_stats.ndis
+                    + faiss.cvar.indexIVF_stats.nq * self.n_list
+                )
+
+            rec = compute_recall(distances, run_dists, k)
+            if rec >= self.recall:
+                return distcomp / self.index.ntotal
+            else:
+                return None
+
+        dist_frac = partition_by(list(range(1, self.n_list)), tester)
+        if dist_frac is not None:
+            return dist_frac
+        else:
+            raise Exception("Could not get the desired recall, even visiting the entire dataset")
+        
+
+
 def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[]):
     assert len( additional_header ) == len(additional_row)
     dataset, distance_metric = rd.read_hdf5(dataset_path, "train")
