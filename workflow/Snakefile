@@ -267,17 +267,36 @@ rule run_messi_one:
 		dsfile = df.query('Config=='+row)['DataFile'].values[0]
 		queryfile = df.query('Config=='+row)['QueryFile'].values[0]
 		slength=str(df.query('Config=='+row)['SeriesLength'].values[0])
-		print(slength)
-		shelline = '/home/qwang/projects/isax-modularized/build/isax --database_filepath='+dsfile+' --query_filepath='+queryfile+' --database_size=1000000 --query_size=1000 --sax_length=16 --sax_cardinality=8 --cpu_cores=4 --log_filepath=messi'+str(row)+'.log --series_length='+slength+' --adhoc_breakpoints --leaf_size=10000 --k=1 --with_id'
-		print(shelline)
+		#print(slength)
+		saxlength=16
+
+		shelline = "rm messi"+row+".log"
 		os.system(shelline)
-		shelline = 'echo '+row+' >messi_results_config'+row+'.txt'
+		
+		shelline = "rm messi_results_interm_config"+row+".txt"
+		os.system(shelline)
+	
+		shelline = "rm messi_results_config"+row+".txt"
+		os.system(shelline)
+
+		shelline = '../isax-modularized/build/isax --database_filepath='+dsfile+' --query_filepath='+queryfile+' --database_size=1000000 --query_size=1000 --sax_length='+str(saxlength)+' --sax_cardinality=8 --cpu_cores=4 --log_filepath=messi'+str(row)+'.log --series_length='+slength+' --adhoc_breakpoints --leaf_size=10000 --k=1 --with_id'
 		#print(shelline)
 		os.system(shelline)
-		shelline = "grep -F 'l2square' messi"+row+".log | grep 'query_engine.c' | cut -d ' ' -f 8 >> messi_results_config"+row+".txt"
+	
+
+		shelline = "grep -F 'l2square' messi"+row+".log | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> messi_results_interm_config"+row+".txt"
 		os.system(shelline)
-		shelline="sed -i '1002,$ d' "+"messi_results_config"+row+".txt"
-		os.system(shelline)
+
+		dict = {}
+		l = []
+		with open("messi_results_interm_config"+row+".txt") as f:
+			for line in f.readlines():
+				x, y = line.split(" ")
+				l.append(int(slength)*int(x) + int(saxlength)*int(y))
+		dict[row] = l
+        
+		df = pd.DataFrame.from_dict(dict,)
+		df.to_csv('messi_results_config'+row+'.txt',index=False)
 
 	
 rule run_messi_all:
