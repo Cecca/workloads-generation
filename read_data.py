@@ -163,7 +163,7 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
         padsize = (8 - (dim % 8)) % 8
         print("Padding with", padsize, "dimensions")
         if padsize > 0:
-            padding = np.zeros((data.shape[0], padsize))
+            padding = np.zeros((data.shape[0], padsize), dtype=np.float32)
             data = np.hstack([data, padding])
     if fname_check:
         actual_n, actual_dim = data.shape
@@ -171,6 +171,12 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
         assert actual_dim == expected_dim, f"The output file should be named appropriately, i.e. it should contain the number of dimensions ({actual_dim}) in the filename"
         assert actual_n == expected_n, f"The output file should be named appropriately, i.e. it should contain the number of points ({actual_n}) in the filename"
     data.tofile(output_path)
+    # check that the conversion produced the same files
+    base, _ = read_multiformat(input_path, what)
+    converted, _ = read_multiformat(output_path, what)
+    if padsize is not None:
+        converted = converted[:, :-padsize]
+    assert np.all(np.isclose(base, converted)), "converted file and original do not have the same content"
 
 
 def str_to_digits(sids_str):
