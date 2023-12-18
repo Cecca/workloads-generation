@@ -4,7 +4,7 @@ from snakemake.utils import Paramspace
 def setup_param_space():
     datasets = [
         "fashion-mnist-784-euclidean",
-        "glove-100-angular",
+        # "glove-100-angular",
     ]
     target_difficulty = {
         "faiss_ivf": {

@@ -108,6 +108,33 @@ rule metrics_builtin_queries:
         df.to_csv(output[0], index=False)
 
 
+rule plot_ann_bench_distcomps:
+    input:
+        "results/metrics/all-builtin.csv"
+    output:
+        "results/plots/ann-benchmarks-distcomps.png"
+    run:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        import seaborn.objects as so
+        import pandas as pd
+
+        df = pd.read_csv(input[0])
+        print(df)
+
+        sns.kdeplot(
+            data=df,
+            x = "distcomp",
+            hue = "dataset",
+            cut = 0
+        )
+        plt.tight_layout()
+        plt.savefig(output[0])
+
+
+
 # Here we compute the metrics for each individual dataset, this
 # a subtask of `metrics_builtin_queries`
 rule eval_metrics_builtin_queries:
