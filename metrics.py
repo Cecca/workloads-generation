@@ -205,7 +205,7 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
     # index = build_index(dataset, n_list, distance_metric)
     exact_index = faiss.IndexFlatL2(dataset.shape[1])
     exact_index.add(dataset)
-    ivf_difficulty = EmpiricalDifficultyIVF(dataset, recall=0.99, distance_metric=distance_metric, exact_index=exact_index)
+    ivf_difficulty = EmpiricalDifficultyIVF(dataset, recall=target_recall, distance_metric=distance_metric, exact_index=exact_index)
 
     with open(output_path, "w", newline="") as fp:
         writer = csv.writer(fp)
