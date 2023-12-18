@@ -32,12 +32,19 @@
 # Rules in Snakemake (rather, their `run` block) can be
 # written directly in Python
 
-
 ############################################################
 #
 # General setup
 #
 ############################################################
+
+# Configuration of the data directory. Setting the environment variable
+# WORKGEN_DATA_DIR allows to specify a directory where to look
+# for files and where to save preprocessed ones. The default
+# is a hidden directory in the current working directory.
+import os
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")
+GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
@@ -139,7 +146,7 @@ rule plot_ann_bench_distcomps:
 # a subtask of `metrics_builtin_queries`
 rule eval_metrics_builtin_queries:
     input:
-        ".data/{name}.hdf5"
+        os.path.join(DATA_DIR, "{name}.hdf5")
     output:
         "results/metrics/{name}-k{k}.csv",
     run:
@@ -174,9 +181,11 @@ rule synthetic_metrics:
 # relative contrast metric
 rule generate_synthetic:
     input:
-        ".data/{dataset}.hdf5"
+        os.path.join( DATA_DIR, "{dataset}.hdf5" )
     output:
-        f".generated/{paramspace.wildcard_pattern}.hdf5",
+        os.path.join(GENERATED_DIR, 
+          f"{paramspace.wildcard_pattern}.hdf5"
+        ),
     threads: workflow.cores
     params:
         paramspace.instance
@@ -203,8 +212,11 @@ rule generate_synthetic:
 # query sets
 rule eval_metrics:
     input:
-        data = ".data/{dataset}.hdf5",
-        queries = f".generated/{paramspace.wildcard_pattern}.hdf5"
+        data = os.path.join(DATA_DIR, "{dataset}.hdf5"),
+        queries =
+          os.path.join(GENERATED_DIR, 
+            f"{paramspace.wildcard_pattern}.hdf5"
+          ),
     output:
         f"results/metrics/{paramspace.wildcard_pattern}.csv",
     params:
@@ -276,7 +288,7 @@ rule umap_embedding:
 
 rule prepare_data_file:
     output:
-        ".data/{name}.hdf5"
+        os.path.join(DATA_DIR, "{name}.hdf5")
     wildcard_constraints:
         name="[a-zA-Z0-9-]+"
     run:
