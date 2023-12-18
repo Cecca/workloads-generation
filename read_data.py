@@ -155,13 +155,21 @@ def read_multiformat(name, what, data_limit=None):
     return data, distance_metric
 
 
-def hdf5_to_bin(input_path, output_path, what, fname_check=True):
+def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=True):
     assert what in ["train", "test"]
     data, _ = read_hdf5(input_path, what)
+    if with_padding:
+        dim = data.shape[1]
+        padsize = (8 - (dim % 8)) % 8
+        print("Padding with", padsize, "dimensions")
+        if padsize > 0:
+            padding = np.zeros((data.shape[0], padsize))
+            data = np.hstack([data, padding])
     if fname_check:
-        actual_dim = data.shape[1]
-        _, expected_dim = parse_filename(output_path)
-        assert actual_dim == expected_dim, "The output file should be named appropriately, i.e. it should contain the number of dimensions in the filename"
+        actual_n, actual_dim = data.shape
+        expected_n, expected_dim = parse_filename(output_path)
+        assert actual_dim == expected_dim, f"The output file should be named appropriately, i.e. it should contain the number of dimensions ({actual_dim}) in the filename"
+        assert actual_n == expected_n, f"The output file should be named appropriately, i.e. it should contain the number of points ({actual_n}) in the filename"
     data.tofile(output_path)
 
 
