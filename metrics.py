@@ -104,6 +104,7 @@ def partition_by(candidates, fun):
             break
         lower = upper
         upper = upper * 2 if upper > 0 else 1
+    upper = min(upper, len(candidates))
 
     # now we know that the predicate is satisfied between prev_ids (where it 
     # is not satisfied) and cur_idx (where it is satisfied). So we do a binary search between the two
