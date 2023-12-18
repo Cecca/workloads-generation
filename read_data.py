@@ -155,9 +155,13 @@ def read_multiformat(name, what, data_limit=None):
     return data, distance_metric
 
 
-def hdf5_to_bin(input_path, output_path, what):
+def hdf5_to_bin(input_path, output_path, what, fname_check=True):
     assert what in ["train", "test"]
     data, _ = read_hdf5(input_path, what)
+    if fname_check:
+        actual_dim = data.shape[1]
+        _, expected_dim = parse_filename(output_path)
+        assert actual_dim == expected_dim, "The output file should be named appropriately, i.e. it should contain the number of dimensions in the filename"
     data.tofile(output_path)
 
 
