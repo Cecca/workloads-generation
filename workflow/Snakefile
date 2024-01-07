@@ -53,7 +53,7 @@ min_version("7.24")
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
 import pandas as pd
-from parameters import setup_param_space
+from parameters import setup_param_space, get_data_path
 
 # This `paramspace` variable is a wrapper around a dataframe
 # that holds all the parameter combinations we want to
@@ -61,7 +61,6 @@ from parameters import setup_param_space
 # function in setup_param_space().
 # More on this here: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#parameter-space-exploration
 paramspace = setup_param_space()
-print(paramspace.dataframe)
 
 # For convenience, here we extract the set of datasets we
 # use in this evaluation.
@@ -90,7 +89,7 @@ rule plot_synthetic_difficulty:
         print(averages[["dataset", "target", "distcomp", "rc_10", "lid_10"]])
 
         (
-          so.Plot(df, y="rc_10", x="distcomp", color="target")
+          so.Plot(df, y="lid_10", x="distcomp", color="target")
             .facet("dataset")
             .add(so.Dot())
             #.add(so.Dot(color="black"), data=averages)
@@ -146,9 +145,9 @@ rule plot_ann_bench_distcomps:
 # a subtask of `metrics_builtin_queries`
 rule eval_metrics_builtin_queries:
     input:
-        os.path.join(DATA_DIR, "{name}.hdf5")
+        get_data_path(DATA_DIR)
     output:
-        "results/metrics/{name}-k{k}.csv",
+        "results/metrics/{dataset}-k{k}.csv",
     run:
         import metrics
         metrics.metrics_csv(
@@ -157,7 +156,7 @@ rule eval_metrics_builtin_queries:
           output[0],
           int(wildcards['k']),
           additional_header = ["dataset", "k"],
-          additional_row = [wildcards['name'], int(wildcards['k'])]
+          additional_row = [wildcards['dataset'], int(wildcards['k'])]
         )
 
 
@@ -181,7 +180,8 @@ rule synthetic_metrics:
 # relative contrast metric
 rule generate_synthetic:
     input:
-        os.path.join( DATA_DIR, "{dataset}.hdf5" )
+        #os.path.join(DATA_DIR, "{dataset}.hdf5")
+        get_data_path(DATA_DIR)
     output:
         os.path.join(GENERATED_DIR, 
           f"{paramspace.wildcard_pattern}.hdf5"
@@ -212,7 +212,7 @@ rule generate_synthetic:
 # query sets
 rule eval_metrics:
     input:
-        data = os.path.join(DATA_DIR, "{dataset}.hdf5"),
+        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
         queries =
           os.path.join(GENERATED_DIR, 
             f"{paramspace.wildcard_pattern}.hdf5"
