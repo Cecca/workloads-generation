@@ -5,7 +5,23 @@ def setup_param_space():
     datasets = [
         "fashion-mnist-784-euclidean",
         # "glove-100-angular",
+        "sald", 
+        "glove-100-bin"
     ]
+    queries = {
+        "sald": [
+        "sald",
+        "sald-noise-10",
+        "sald-noise-30",
+        "sald-noise-50"
+        ],
+        "glove-100-bin": [
+        "glove-noise-0",
+        "glove-noise-10",
+        "glove-noise-30",
+        "glove-noise-50"
+        ]
+    }
     target_difficulty = {
         "faiss_ivf": {
             "fashion-mnist-784-euclidean": [
@@ -30,7 +46,9 @@ def setup_param_space():
     }
     num_queries = {
         "fashion-mnist-784-euclidean": [5],
-        "glove-100-angular": [5]
+        "glove-100-angular": [5],
+        "sald": [5], 
+        "glove-100-bin":[5]
     }
     scale = {
         "fashion-mnist-784-euclidean": [10],

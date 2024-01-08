@@ -5,9 +5,13 @@ import requests
 from utils import compute_distances
 import sys
 
-dataset_path="/data/qwang/datasets/"
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") #/mnt/hddhelp/workgen_data/
+GENERATED_DIR = os.path.join(DATA_DIR, "generated")
+
+dataset_path="/data/qwang/datasets/" # TODO: simlinks in /mnt/hddhelp/workgen_data/
 sald_noise_path="/mnt/hddhelp/ts_benchmarks/datasets/sald/"
 glove_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/"
+
 
 DATASETS = {
 "astro": f"{dataset_path}astro-256-100m.bin",
@@ -23,7 +27,8 @@ DATASETS = {
 "glove-200": "glove-200-angular.hdf5",
 "mnist": "mnist-784-euclidean.hdf5",
 "sift": "sift-128-euclidean.hdf5",
-"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin"
+"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
+"sald-small": f"{DATA_DIR}sald-128-1m.bin",
 }
 
 WORKLOADS = {
