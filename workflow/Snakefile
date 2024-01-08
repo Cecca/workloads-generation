@@ -240,7 +240,7 @@ rule metrics_all:
           # "results/metrics/{name}-{queries}-k{k}-messi.csv",
           os.path.join(RES_DIR,"metrics/{name}_{queries}_k{k}.csv"),
           # name      = DATASETS,
-          name = ["sald-128-100m"], #['fashion-mnist'],
+          name = ["sald-128-1m"], #['fashion-mnist'],
           queries = ["sald-128-1k"], #['fashion-mnist'],
           k = [10]
         )
