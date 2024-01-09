@@ -47,15 +47,15 @@ def compute_expansion(distances, k, scale="log"):
     else:
         return distances[2*k] / distances[k]
 
-def compute_metrics(distances, epsilons, k, scale="log"):
+# def compute_metrics(distances, epsilons, k, scale="log"):
    
-    lid = compute_lid(distances, k-1, scale)
-    rc = compute_rc(distances, k-1, scale)
-    expansion = compute_expansion(distances, k-1, scale)
+#     lid = compute_lid(distances, k-1, scale)
+#     rc = compute_rc(distances, k-1, scale)
+#     expansion = compute_expansion(distances, k-1, scale)
 
-    epsilons_hardness = [compute_epsilon_hardness(distances, e) for e in epsilons]
+#     epsilons_hardness = [compute_epsilon_hardness(distances, e) for e in epsilons]
 
-    return lid, rc, expansion, epsilons_hardness
+#     return lid, rc, expansion, epsilons_hardness
 
 
 def read_sys_argv_list(start_index=4):
@@ -64,20 +64,39 @@ def read_sys_argv_list(start_index=4):
     else:
         return None
 
-def get_epsilons(queries, dataset, distance_metric):
-    # max_dist_arr = [compute_distances(qq, None, distance_metric, dataset)[-1] for qq in queries]
-    # # print(max_dist_arr)
-    # mean_max_dist = sum(max_dist_arr)/len(max_dist_arr)
-
+def get_epsilons(queries, dataset, distance_metric, threads=None):
+    print("Compute epsilons for a given dataset and workload")
+    sample = len(queries)
     max_e_arr = []
-    for qq in queries:
-        dist = compute_distances(qq, None, distance_metric, dataset)
+    # #for qq in queries:
+    # for i in tqdm(range(sample)):
+    #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
+    #     max_e = dist[-1]/dist[0]-1
+    #     max_e_arr.append(max_e)
+    def compute_query(i):
+        dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
         max_e = dist[-1]/dist[0]-1
-        max_e_arr.append(max_e)
-    mean_max_e = sum(max_e_arr)/len(max_e_arr)
-    print(mean_max_e)
+        return max_e
 
-    # return [mean_max_dist*r for r in [0.001, 0.01, 0.05]]
+    if threads is None:
+        import os
+        threads = os.cpu_count()
+    with ThreadPoolExecutor(threads) as pool:
+        tasks = [
+            pool.submit(
+                compute_query,
+                i
+            )
+            for i in range(sample)
+        ]
+        max_e_arr = []
+        for task in tqdm(as_completed(tasks), total=len(tasks)):
+            max_e = task.result()
+            max_e_arr.append(max_e)
+
+    mean_max_e = sum(max_e_arr)/len(max_e_arr)
+    print(f'mean_max_epsilon: {mean_max_e}')
+
     return [mean_max_e*r for r in[0.25, 0.5, 0.75]]
 
 def build_index(dataset, n_list, distance_metric):
@@ -196,7 +215,7 @@ class EmpiricalDifficultyIVF(object):
         
 
 
-def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[], threads=None):
+def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, additional_header=[], additional_row=[], threads=None, sample=0.05):
     assert len( additional_header ) == len(additional_row)
     dataset, distance_metric = rd.read_multiformat(dataset_path, "train")
     queries, _ = rd.read_multiformat(queries_path, "test")
@@ -204,6 +223,11 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
     exact_index = faiss.IndexFlatL2(dataset.shape[1])
     exact_index.add(dataset)
     ivf_difficulty = EmpiricalDifficultyIVF(dataset, recall=target_recall, distance_metric=distance_metric, exact_index=exact_index)
+
+    epsilons = get_epsilons(queries[:int(sample*len(queries))+1], exact_index, distance_metric)
+    #epsilons = [.5, 1, 1.5] # temp to test 
+    epsilons_str = '_'.join(f'{e:.2f}' for e in epsilons)
+    print (f'e-values (based on {sample} query sample): {epsilons_str}')
 
     def compute_row(i):
         """Computes the metrics of a single query, i.e. a single row of 
@@ -215,9 +239,11 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
         rc = compute_rc(q_distances, k, "linear")
         expansion = compute_expansion(q_distances, k, "linear")
         empirical_difficulty = ivf_difficulty.evaluate(query, k, q_distances)
+        epsilons_hard = [compute_epsilon_hardness(q_distances, e) for e in epsilons]
         
         row = [i, lid, rc, expansion, empirical_difficulty]
         row.extend(additional_row)
+        row.extend(epsilons_hard)
         return row
 
     if threads is None:
@@ -243,10 +269,11 @@ def metrics_csv(dataset_path, queries_path, output_path, k, target_recall=0.99, 
         writer = csv.writer(fp)
 
         header = ["i", "lid_"+str(k), "rc_"+str(k), f"exp_{2*k}|{k}"]
-        # header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
+        
         # header.extend(["distcomp", "recall", "elapsed"])
         header.extend(["distcomp"])
         header.extend(additional_header)
+        header.extend(["eps_" + f'{e:.2f}' for e in epsilons])
         writer.writerow(header)
 
         for row in rows:

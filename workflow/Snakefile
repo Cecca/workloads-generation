@@ -43,8 +43,9 @@
 # for files and where to save preprocessed ones. The default
 # is a hidden directory in the current working directory.
 import os
-DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") # on nefeli: export WORKGEN_DATA_DIR=/mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
+RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
@@ -65,7 +66,7 @@ paramspace = setup_param_space()
 # For convenience, here we extract the set of datasets we
 # use in this evaluation.
 DATASETS = set(paramspace.dataframe['dataset'])
-BIN_CONFIGS = pd.read_csv("bin_configs.csv")['Config'].values
+BIN_CONFIGS = pd.read_csv("workflow/bin_configs.csv")['Config'].values
 
 # This rule plots the number of distance computations against
 # the RC metric for different datasets, coloring points
@@ -231,6 +232,53 @@ rule eval_metrics:
           additional_header = ["dataset", "target_low", "target_high", "target_metric"],
           additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
         )
+
+
+rule metrics_all:
+    input:
+        expand(
+          # "results/metrics/{name}-{queries}-k{k}-messi.csv",
+          os.path.join(RES_DIR,"metrics/{name}_{queries}_k{k}.csv"),
+          # name      = DATASETS,
+          name = ["sald-128-1m"], #['fashion-mnist'],
+          queries = ["sald-128-1k"], #['fashion-mnist'],
+          k = [10]
+        )
+    output:
+        # "results/metrics/metrics-messi-all.csv"
+        os.path.join(RES_DIR,"metrics/metrics-all.csv")
+    threads: workflow.cores / 2
+    run:
+        import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input))
+        df.to_csv(output[0], index=False)
+
+
+rule eval_all_metrics:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),  #  extend with multiple extensions
+        queries = os.path.join(DATA_DIR, "{queries}.bin"),
+    output:
+        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
+    threads: workflow.cores / 2
+    params:
+        conf = paramspace.instance
+    run:
+        import metrics
+        metrics.metrics_csv(
+          input['data'],
+          input['queries'],
+          output[0],
+          int(wildcards['k']))
+
+# add messi output to other metrics.csv
+rule eval_messi:
+    input:
+        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
+    output:
+        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}_messi.csv")
+
+# todo: rule to add noise to queries if not exists 
 
 ################################################################################
 #

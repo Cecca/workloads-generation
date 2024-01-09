@@ -28,6 +28,20 @@ def setup_param_space():
         "sald-128-1000000",
         "nytimes-256-angular",
     ]
+    queries = {
+        "sald": [
+        "sald",
+        "sald-noise-10",
+        "sald-noise-30",
+        "sald-noise-50"
+        ],
+        "glove-100-bin": [
+        "glove-noise-0",
+        "glove-noise-10",
+        "glove-noise-30",
+        "glove-noise-50"
+        ]
+    }
     target_difficulty = {
         "faiss_ivf": {
             "fashion-mnist-784-euclidean": [

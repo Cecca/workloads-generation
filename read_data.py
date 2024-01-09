@@ -5,25 +5,29 @@ import requests
 from utils import compute_distances
 import sys
 
-dataset_path = "/data/qwang/datasets/"
-sald_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/sald/"
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") #/mnt/hddhelp/workgen_data/
+GENERATED_DIR = os.path.join(DATA_DIR, "generated")
+
+dataset_path="/data/qwang/datasets/" # TODO: simlinks in /mnt/hddhelp/workgen_data/
+sald_noise_path="/mnt/hddhelp/ts_benchmarks/datasets/sald/"
 glove_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/"
 
 DATASETS = {
-    "astro": f"{dataset_path}astro-256-100m.bin",
-    "deep1b": f"{dataset_path}deep1b-96-100m.bin",
-    "f10": f"{dataset_path}f10-256-100m.bin",
-    "f5": f"{dataset_path}f5-256-100m.bin",
-    "rw": f"{dataset_path}rw-256-100m.bin",
-    "seismic": f"{dataset_path}seismic-256-100m.bin",
-    "sald": f"{dataset_path}sald-128-100m.bin",
-    "fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
-    "glove-100": "glove-100-angular.hdf5",
-    "glove-25": "glove-25-angular.hdf5",
-    "glove-200": "glove-200-angular.hdf5",
-    "mnist": "mnist-784-euclidean.hdf5",
-    "sift": "sift-128-euclidean.hdf5",
-    "glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
+"astro": f"{dataset_path}astro-256-100m.bin",
+"deep1b": f"{dataset_path}deep1b-96-100m.bin",
+"f10": f"{dataset_path}f10-256-100m.bin",
+"f5": f"{dataset_path}f5-256-100m.bin",
+"rw": f"{dataset_path}rw-256-100m.bin",
+"seismic": f"{dataset_path}seismic-256-100m.bin",
+"sald": f"{dataset_path}sald-128-100m.bin",
+"fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
+"glove-100": "glove-100-angular.hdf5",
+"glove-25": "glove-25-angular.hdf5",
+"glove-200": "glove-200-angular.hdf5",
+"mnist": "mnist-784-euclidean.hdf5",
+"sift": "sift-128-euclidean.hdf5",
+"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
+"sald-small": f"{DATA_DIR}sald-128-1m.bin",
 }
 
 WORKLOADS = {
