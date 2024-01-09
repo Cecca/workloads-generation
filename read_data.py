@@ -92,6 +92,9 @@ def read_hdf5(filename, what, limit=None):
         else:
             data = hfp[what][:]
     if distance_metric == "angular" and what in ["train", "test"]:
+        # discard all-zero vectors (there are some in the nytimes dataset)
+        mask = np.where(data.any(axis=1))[0]
+        data = data[mask, :]
         norms = np.linalg.norm(data, axis=1)
         assert (norms > 0).all()
         data /= norms[:, np.newaxis]

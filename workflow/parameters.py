@@ -26,7 +26,7 @@ def setup_param_space():
         # "fashion-mnist-784-euclidean",
         # "glove-100-angular",
         "sald-128-1000000",
-        # "nytimes-256-angular",
+        "nytimes-256-angular",
     ]
     target_difficulty = {
         "faiss_ivf": {
