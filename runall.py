@@ -1,8 +1,10 @@
+import pandas as pd
 import itertools
 import logging
 import os
 from pprint import pprint
 
+import metrics
 import generate
 import read_data
 from caching import MEM
@@ -124,9 +126,29 @@ def build_synthetic_workloads(datasets, k_values=[10], num_queries=[5]):
     return results
 
 
+@MEM.cache
+def compute_metrics(workloads):
+    alldf = []
+    for workload in workloads:
+        dataset, distance_metric = read_data.read_multiformat(
+            get_data_path(workload["dataset"]), "train"
+        )
+        df = metrics.metrics_dataframe(
+            dataset,
+            workload["queries"],
+            distance_metric,
+            workload["k"],
+            additional_header=["dataset", "k"],
+            additional_row=[workload["dataset"], workload["k"]],
+        )
+        alldf.append(df)
+    return pd.concat(alldf, ignore_index=True)
+
+
 def main():
     synthetic = build_synthetic_workloads(DATASETS)
-    pprint(synthetic)
+    metrics = compute_metrics(synthetic)
+    print(metrics)
 
 
 main()

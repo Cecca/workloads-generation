@@ -145,7 +145,6 @@ def partition_by(candidates, fun):
 
 @MEM.cache
 def _build_faiss_ivf_index(dataset, n_list):
-    import os
     import logging
 
     logging.info("Computing index")
@@ -236,6 +235,74 @@ class EmpiricalDifficultyIVF(object):
             )
 
 
+@MEM.cache
+def metrics_dataframe(
+    dataset,
+    queries,
+    distance_metric,
+    k,
+    target_recall=0.99,
+    additional_header=[],
+    additional_row=[],
+    threads=None,
+    sample=0.05,
+):
+    import pandas as pd
+
+    assert len(additional_header) == len(additional_row)
+
+    exact_index = faiss.IndexFlatL2(dataset.shape[1])
+    exact_index.add(dataset)
+    ivf_difficulty = EmpiricalDifficultyIVF(
+        dataset,
+        recall=target_recall,
+        distance_metric=distance_metric,
+        exact_index=exact_index,
+    )
+
+    epsilons = get_epsilons(
+        queries[: int(sample * len(queries)) + 1], exact_index, distance_metric
+    )
+    # epsilons_str = "_".join(f"{e:.2f}" for e in epsilons)
+    # print(f"e-values (based on {sample} query sample): {epsilons_str}")
+
+    def compute_row(i):
+        """Computes the metrics of a single query, i.e. a single row of
+        the output csv file"""
+        query = queries[i, :].astype(np.float32)
+        q_distances = compute_distances(query, None, distance_metric, exact_index)[0]
+        lid = compute_lid(q_distances, k, "linear")
+        rc = compute_rc(q_distances, k, "linear")
+        expansion = compute_expansion(q_distances, k, "linear")
+        empirical_difficulty = ivf_difficulty.evaluate(query, k, q_distances)
+        epsilons_hard = [compute_epsilon_hardness(q_distances, e) for e in epsilons]
+
+        row = [i, lid, rc, expansion, empirical_difficulty]
+        row.extend(additional_row)
+        row.extend(epsilons_hard)
+        return row
+
+    if threads is None:
+        import os
+
+        threads = os.cpu_count()
+    nqueries = queries.shape[0]
+    with ThreadPoolExecutor(threads) as pool:
+        tasks = [pool.submit(compute_row, i) for i in range(nqueries)]
+        rows = []
+        for task in tqdm(as_completed(tasks), total=len(tasks)):
+            row = task.result()
+            rows.append(row)
+        rows.sort()
+
+    header = ["i", "lid_" + str(k), "rc_" + str(k), f"exp_{2*k}|{k}"]
+    header.extend(["distcomp"])
+    header.extend(additional_header)
+    header.extend(["eps_" + f"q{q}" for q in [25, 50, 75]])
+    df = pd.DataFrame(rows, columns=header)
+    return df
+
+
 def metrics_csv(
     dataset_path,
     queries_path,
@@ -302,7 +369,6 @@ def metrics_csv(
 
         header = ["i", "lid_" + str(k), "rc_" + str(k), f"exp_{2*k}|{k}"]
 
-        # header.extend(["distcomp", "recall", "elapsed"])
         header.extend(["distcomp"])
         header.extend(additional_header)
         header.extend(["eps_" + f"{e:.2f}" for e in epsilons])
@@ -310,20 +376,6 @@ def metrics_csv(
 
         for row in rows:
             writer.writerow(row)
-
-        # for i in tqdm(range(nqueries)):
-        #     query = queries[i,:].astype(np.float32)
-        #     q_distances = compute_distances(query, None, distance_metric, exact_index)[0]
-        #     # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k)
-        #     lid = compute_lid(q_distances, k, "linear")
-        #     rc = compute_rc(q_distances, k, "linear")
-        #     expansion = compute_expansion(q_distances, k, "linear")
-        #     empirical_difficulty = ivf_difficulty.evaluate(query, k, q_distances)
-        #
-        #     row = [i, lid, rc, expansion, empirical_difficulty]
-        #     row.extend(additional_row)
-        #
-        #     writer.writerow(row)
 
 
 if __name__ == "__main__":
