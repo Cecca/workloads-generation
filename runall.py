@@ -1,3 +1,4 @@
+from joblib import parallel
 import pandas as pd
 import itertools
 import logging
@@ -138,17 +139,81 @@ def compute_metrics(workloads):
             workload["queries"],
             distance_metric,
             workload["k"],
-            additional_header=["dataset", "k"],
-            additional_row=[workload["dataset"], workload["k"]],
+            additional_header=[
+                "dataset",
+                "k",
+                "difficulty_type",
+                "target_lower",
+                "target_upper",
+            ],
+            additional_row=[
+                workload["dataset"],
+                workload["k"],
+                workload["difficulty"],
+                workload["target_lower"],
+                workload["target_upper"],
+            ],
         )
         alldf.append(df)
     return pd.concat(alldf, ignore_index=True)
 
 
+def plot_metrics(metrics, output):
+    import seaborn.objects as so
+    import numpy as np
+
+    datasets = metrics["dataset"].drop_duplicates()
+
+    def normalize(column, how="minmax"):
+        if not np.issubdtype(column.dtype, np.number) or column.name == "distcomp":
+            return column
+        elif how == "minmax":
+            return (column - column.min()) / (column.max() - column.min())
+        elif how == "none":
+            return column
+        else:
+            return (column - column.mean()) / column.std()
+
+    normalized = []
+
+    for dataset in datasets:
+        dmetrics = metrics[metrics["dataset"] == dataset].copy()
+        dmetrics["target"] = dmetrics[["target_lower", "target_upper"]].apply(
+            lambda row: f"{row[0]}--{row[1]}", axis=1
+        )
+        dmetrics.reset_index(inplace=True)
+        dmetrics = dmetrics.apply(normalize)
+        normalized.append(dmetrics)
+
+    metrics = pd.concat(normalized)
+
+    numerics = [
+        "distcomp",
+        "lid_10",
+        "rc_10",
+        "exp_20|10",
+        "eps_q25",
+        "eps_q50",
+        "eps_q75",
+    ]
+    melted = pd.melt(
+        metrics, ["index", "dataset", "difficulty_type", "target"], numerics
+    )
+
+    (
+        so.Plot(melted, y="value", x="variable", color="target", group="index")
+        .facet(row="dataset", col="difficulty_type")
+        .add(so.Dot())
+        .add(so.Line())
+        .layout(size=(10, 10))
+        .save(output)
+    )
+
+
 def main():
     synthetic = build_synthetic_workloads(DATASETS)
     metrics = compute_metrics(synthetic)
-    print(metrics)
+    plot_metrics(metrics, output="results/plots/synthetic-difficulty.png")
 
 
 main()
