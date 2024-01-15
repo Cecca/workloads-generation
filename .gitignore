@@ -8,3 +8,4 @@ imgs
 /.snakemake
 .index-cache
 .joblib-cache
+messi/build

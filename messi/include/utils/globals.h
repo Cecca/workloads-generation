@@ -28,7 +28,7 @@
 #define CLK_ID CLOCK_MONOTONIC
 #define NSEC_INSEC 1000000000L
 
-int clock_code;
+extern int clock_code;
 
 typedef struct TimeDiff {
     long tv_nsec;
@@ -57,11 +57,11 @@ inline void getTimeDiff(TimeDiff * t_diff, struct timespec t_start, struct times
 #endif
 
 #ifdef PROFILING
-unsigned int leaf_counter_profiling;
-unsigned int sum2sax_counter_profiling;
-unsigned int l2square_counter_profiling;
-pthread_mutex_t *log_lock_profiling;
-unsigned int query_id_profiling;
+extern unsigned int leaf_counter_profiling;
+extern unsigned int sum2sax_counter_profiling;
+extern unsigned int l2square_counter_profiling;
+extern pthread_mutex_t *log_lock_profiling;
+extern unsigned int query_id_profiling;
 #endif
 
 

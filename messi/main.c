@@ -19,6 +19,18 @@
 #include "query_engine.h"
 
 
+int clock_code;
+unsigned int leaf_counter_profiling;
+unsigned int sum2sax_counter_profiling;
+unsigned int l2square_counter_profiling;
+pthread_mutex_t *log_lock_profiling;
+unsigned int query_id_profiling;
+
+__m256i M256I_1;
+__m256i M256I_BREAKPOINTS_OFFSETS_0_7, M256I_BREAKPOINTS_OFFSETS_8_15;
+__m256i M256I_BREAKPOINTS8_OFFSETS_0_7, M256I_BREAKPOINTS8_OFFSETS_8_15;
+__m256i *M256I_OFFSETS_BY_SEGMENTS;
+
 int main(int argc, char **argv) {
     Config const *config = initializeConfig(argc, argv);
 

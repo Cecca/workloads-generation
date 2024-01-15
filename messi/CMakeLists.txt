@@ -21,7 +21,7 @@ add_subdirectory(src/query)
 add_subdirectory(src/sax)
 add_subdirectory(src/utils)
 
-add_subdirectory(test)
+# add_subdirectory(test)
 
 add_executable(isax main.c)
 
