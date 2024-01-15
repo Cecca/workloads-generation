@@ -7,3 +7,4 @@ imgs
 /results
 /.snakemake
 .index-cache
+.joblib-cache

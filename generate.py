@@ -12,8 +12,10 @@ import utils
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
+from caching import MEM
 
 
+@MEM.cache
 def generate_queries_annealing(
     dataset,
     distance_metric,
@@ -58,14 +60,14 @@ def generate_queries_annealing(
     with ThreadPoolExecutor(threads) as pool:
         tasks = {
             pool.submit(
-                annealing, 
+                annealing,
                 score,
                 dataset[x, :],
                 gen_neighbor,
                 target_low,
                 target_high,
                 fast_annealing_schedule(initial_temperature),
-                max_steps=max_steps
+                max_steps=max_steps,
             ): x
             for x in starting_ids
         }
@@ -74,7 +76,9 @@ def generate_queries_annealing(
             try:
                 query = future.result()
             except Exception as exc:
-                logging.error("Error in generating query from %d: %s\n%s" % (tasks[future], exc))
+                logging.error(
+                    "Error in generating query from %d: %s\n%s" % (tasks[future], exc)
+                )
             else:
                 queries.append(query)
     queries = np.vstack(queries)
@@ -132,11 +136,13 @@ def annealing(
             logging.info("Returning query point with score %f", y_next)
             return x_next
         # elif y <= y_next <= target_low or target_high <= y_next <= y:
-        elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(abs(y - target_low), abs(y - target_high)):
+        elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(
+            abs(y - target_low), abs(y - target_high)
+        ):
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
             logging.debug("new best score %f", y)
-            x_best, y_best  = x, y
+            x_best, y_best = x, y
             steps_since_last_improvement = 0
         else:
             # we pick the neighbor by the Metropolis criterion
@@ -145,10 +151,19 @@ def annealing(
             p = exp(-delta / t)
             if random.random() < p:
                 x, y = x_next, y_next
-                logging.debug("new score %f temperature %f (%d since last improvement, p=%f, delta=%f)", y, t, steps_since_last_improvement, p, delta)
+                logging.debug(
+                    "new score %f temperature %f (%d since last improvement, p=%f, delta=%f)",
+                    y,
+                    t,
+                    steps_since_last_improvement,
+                    p,
+                    delta,
+                )
             steps_since_last_improvement += 1
 
-    raise Exception("Could not find point in the desired range, started from %s" % y_start)
+    raise Exception(
+        "Could not find point in the desired range, started from %s" % y_start
+    )
 
 
 def fast_annealing_schedule(t1):
@@ -188,7 +203,7 @@ def partition_by(candidates, fun):
         lower = upper
         upper = upper * 2 if upper > 0 else 1
 
-    # now we know that the predicate is satisfied between prev_ids (where it 
+    # now we know that the predicate is satisfied between prev_ids (where it
     # is not satisfied) and cur_idx (where it is satisfied). So we do a binary search between the two
     while lower < upper:
         mid = (lower + upper) // 2
@@ -202,12 +217,16 @@ def partition_by(candidates, fun):
     return cur_res
 
 
-def faiss_ivf_scorer(exact_index, dataset, distance_metric, k, recall=0.99, n_list=None):
+def faiss_ivf_scorer(
+    exact_index, dataset, distance_metric, k, recall=0.99, n_list=None
+):
     """
     Score a point by the fraction of distance computations (wrt to the total) that the
     faiss ivf index has to do to reach a given target recall.
     """
-    difficulty_ivf = EmpiricalDifficultyIVF(dataset, recall, exact_index, distance_metric)
+    difficulty_ivf = EmpiricalDifficultyIVF(
+        dataset, recall, exact_index, distance_metric
+    )
 
     def inner(x):
         return difficulty_ivf.evaluate(x, k)
@@ -729,4 +748,3 @@ def main_annealing():
 
 if __name__ == "__main__":
     main_annealing()
-    
