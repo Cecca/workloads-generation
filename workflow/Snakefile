@@ -46,6 +46,7 @@ import os
 DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") # on nefeli: export WORKGEN_DATA_DIR=/mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
+MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/isax")
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
@@ -232,22 +233,30 @@ rule eval_metrics:
           additional_header = ["dataset", "target_low", "target_high", "target_metric"],
           additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
         )
-
+################################################################################
+#
+# TEST: Rules to compute all metrics and merge with messi
+# ===============
+#
+#
+################################################################################
 
 rule metrics_all:
     input:
         expand(
-          # "results/metrics/{name}-{queries}-k{k}-messi.csv",
-          os.path.join(RES_DIR,"metrics/{name}_{queries}_k{k}.csv"),
+          os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv"),
+          #os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
           # name      = DATASETS,
-          name = ["sald-128-1m"], #['fashion-mnist'],
+          dataset = ["sald-128-1m"], #['fashion-mnist'],
           queries = ["sald-128-1k"], #['fashion-mnist'],
           k = [10]
         )
     output:
-        # "results/metrics/metrics-messi-all.csv"
-        os.path.join(RES_DIR,"metrics/metrics-all.csv")
+        os.path.join(RES_DIR,"metrics/metrics-messi-all.csv")
+        # os.path.join(RES_DIR,"metrics/metrics-all.csv")
     threads: workflow.cores / 2
+    wildcard_constraints:
+        k="[0-9]+"
     run:
         import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input))
@@ -271,12 +280,68 @@ rule eval_all_metrics:
           output[0],
           int(wildcards['k']))
 
-# add messi output to other metrics.csv
-rule eval_messi:
+rule run_messi_shell:
     input:
-        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
+        data = get_data_path(DATA_DIR),
+        queries = get_data_path(DATA_DIR),
     output:
-        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}_messi.csv")
+        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt")
+    wildcard_constraints:
+        k="[0-9]+"
+    params:
+        slength = 128, #todo param
+        sax_length = 16,
+        sax_card = 8,
+        leaf_size = 10000,
+        data_samples = 1000000, # todo: from parse_filename()  or save to params
+        q_samples = 1000 # todo: from parse_filename()
+    threads: workflow.cores / 2
+    log:
+         os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log")
+    run:
+        shell("/home/qwang/projects/isax-modularized/build/isax \
+--database_filepath='{input.data}' \
+--query_filepath='{input.queries}' \
+--database_size={params.data_samples} \
+--query_size={params.q_samples} \
+--sax_length={params.sax_length} \
+--sax_cardinality={params.sax_card} \
+--cpu_cores=4 \
+--log_filepath='{log}' \
+--series_length={params.slength} \
+--adhoc_breakpoints \
+--leaf_size={params.leaf_size} \
+--k=1 \
+--with_id ")
+
+        shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> {output} ")
+        #shell("rm {log}")
+
+# add messi output to other metrics.csv
+rule merge_messi:
+    input:
+        messi = os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"),
+        metrics = os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
+    output:
+        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv")
+    wildcard_constraints:
+        k="[0-9]+"
+    params:
+        slength=128, #todo param
+        sax_length=16,
+    run:   
+        l = []      
+        with open(input['messi']) as f:
+            for line in f.readlines():
+                x, y = line.split(" ")
+                l.append(int(params['slength'])*int(x) + int(params['sax_length'])*int(y))
+        #print(l[:5])  
+
+        df = pd.read_csv(input['metrics'])    
+        df['messi'] = l
+        df.to_csv(output[0], index=False)
+
+        # shell('rm {input.messi}')
 
 # todo: rule to add noise to queries if not exists 
 
