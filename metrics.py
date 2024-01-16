@@ -144,13 +144,25 @@ def partition_by(candidates, fun):
 
 def _build_faiss_ivf_index(dataset, n_list):
     import logging
+    import hashlib
+    import os
 
-    logging.info("Computing index")
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    return index
+    sha = hashlib.new("sha256")
+    sha.update(dataset.tobytes())
+    sha = sha.hexdigest()
+    fname = f".index-cache/faiss-ivf-{n_list}-{sha}.bin"
+
+    if not os.path.isfile(fname):
+        if not os.path.isdir(".index-cache"):
+            os.mkdir(".index-cache")
+        logging.info("Computing index")
+        quantizer = faiss.IndexFlatL2(dataset.shape[1])
+        index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+        index.train(dataset)
+        index.add(dataset)
+        faiss.write_index(index, faiss.FileIOWriter(fname))
+
+    return faiss.read_index(faiss.FileIOReader(fname))
 
 
 class EmpiricalDifficultyIVF(object):
@@ -160,34 +172,9 @@ class EmpiricalDifficultyIVF(object):
     """
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
-        import hashlib
-        import os
-        import logging
         from threading import Lock
 
         self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
-
-        # # we cache the index to a finle, whose name depends on the contents
-        # # of the dataset and on the n_list parameter
-        # sha = hashlib.new("sha256")
-        # sha.update(dataset.tobytes())
-        # sha = sha.hexdigest()
-        # fname = f".index-cache/faiss-ivf-{self.n_list}-{sha}.bin"
-        #
-        # if os.path.isfile(fname):
-        #     logging.info("reading index from file")
-        #     index = faiss.read_index(faiss.FileIOReader(fname))
-        # else:
-        #     logging.info("Computing index")
-        #     if not os.path.isdir(".index-cache"):
-        #         os.mkdir(".index-cache")
-        #     quantizer = faiss.IndexFlatL2(dataset.shape[1])
-        #     index = faiss.IndexIVFFlat(
-        #         quantizer, dataset.shape[1], self.n_list, faiss.METRIC_L2
-        #     )
-        #     index.train(dataset)
-        #     index.add(dataset)
-        #     faiss.write_index(index, faiss.FileIOWriter(fname))
 
         self.index = _build_faiss_ivf_index(dataset, self.n_list)
         self.exact_index = exact_index
