@@ -12,10 +12,8 @@ import utils
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
-from caching import MEM
 
 
-@MEM.cache
 def generate_queries_annealing(
     dataset,
     distance_metric,
