@@ -98,6 +98,33 @@ rule plot_synthetic_difficulty:
             .save(output[0])
         )
 
+rule plot_synthetic_runtime:
+    input:
+        "results/metrics/all-synthetic-runtime.csv"
+    output:
+        "results/plots/synthetic-difficulty-runtime.png"
+    run:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        import seaborn.objects as so
+        import pandas as pd
+
+        df = pd.read_csv(input[0])
+        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
+        print(df.columns)
+        averages = df.groupby(["dataset", "target", "target_metric"])[["time_s"]].mean().reset_index()
+
+        (
+          so.Plot(df, y="time_s", x="target")
+            .facet("dataset")
+            .add(so.Dot())
+            .add(so.Dot(color="black"), data=averages)
+            .save(output[0])
+        )
+
+
 # This task computes the CSV file for the metrics
 # of the queries builtin each dataset.
 rule metrics_builtin_queries:
@@ -166,7 +193,7 @@ rule eval_metrics_builtin_queries:
 # on the syntehtic query sets
 rule synthetic_metrics:
     input:
-        expand(
+        metrics = expand(
           "results/metrics/{params}.csv",
           params=paramspace.instance_patterns
         )
@@ -174,7 +201,104 @@ rule synthetic_metrics:
         "results/metrics/all-synthetic.csv"
     run:
         import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
+        df.to_csv(output[0], index=False)
+
+
+# Brings together the information from metrics and index runtime evaluation
+rule eval_runtime:
+    input:
+        metrics = f"results/metrics/{paramspace.wildcard_pattern}.csv",
+        faiss_hnsw = f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
+    output:
+        f"results/metrics/runtime/{paramspace.wildcard_pattern}.csv",
+    run:
+        import pandas as pd
+        metrics = pd.read_csv(input["metrics"]).rename({"i": "query_index"}, axis=1)
+        faiss_runtime = pd.read_csv(input["faiss_hnsw"])
+        df = pd.merge(metrics, faiss_runtime)
+        df.to_csv(output[0], index=False)
+
+
+# Brings together all the metrics and the runtime evaluations of different indices
+# FIXME: keep only one between this and synthetic_metrics
+rule eval_runtime_all:
+    input:
+        expand(
+          "results/metrics/runtime/{params}.csv",
+          params=paramspace.instance_patterns
+        )
+    output:
+        "results/metrics/all-synthetic-runtime.csv"
+    run:
+        import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input))
+        df.to_csv(output[0], index=False)
+
+
+# Run faiss_hnsw on the synthetic datasets
+rule faiss_hnsw_synthetic:
+    input:
+        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
+        queries =
+          os.path.join(GENERATED_DIR, 
+            f"{paramspace.wildcard_pattern}.hdf5"
+          ),
+    output:
+        f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
+    run:
+        import read_data
+        import faiss
+        import utils
+        import time
+        import pandas as pd
+        import json
+
+        k = int(wildcards["k"])
+        dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
+        queryset, _ = read_data.read_multiformat(input["queries"], "test")
+        print("Populating index")
+        index_params = "HNSW32"
+        index = faiss.index_factory(dataset.shape[1], index_params)
+        index.add(dataset)
+        index.train(dataset)
+        print("done")
+        target_recall = 0.95
+
+        res = []
+
+        for q_idx in range(queryset.shape[0]):
+            print("running query", q_idx)
+            q = queryset[q_idx,:].reshape(1, -1)
+            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            index.hnsw.efSearch = 1
+            rec = 0
+            while rec < target_recall and index.hnsw.efSearch < 10**6:
+                print("  efSearch", index.hnsw.efSearch)
+                dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
+                rec = utils.compute_recall(ground_distances, dists, k)
+                if rec >= target_recall or index.hnsw.efSearch > 10**6:
+                    break
+                # we only increment it if we are going to do another iteration
+                index.hnsw.efSearch *= 2
+            print("Timing the runs")
+            nruns = 10
+            tstart = time.time()
+            for _ in range(nruns):
+                index.search(q, k)
+            tend = time.time()
+            elapsed_secs = ( tend - tstart ) / nruns
+            res.append({
+                "query_index": q_idx,
+                "target_recall": target_recall,
+                "index_descr": json.dumps({
+                    "index_params": index_params,
+                    "efSearch": index.hnsw.efSearch
+                }, sort_keys=True),
+                "time_s": elapsed_secs,
+                "recall": rec,
+            })
+        df = pd.DataFrame(res)
         df.to_csv(output[0], index=False)
 
 
@@ -233,6 +357,7 @@ rule eval_metrics:
           additional_header = ["dataset", "target_low", "target_high", "target_metric"],
           additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
         )
+
 ################################################################################
 #
 # TEST: Rules to compute all metrics and merge with messi

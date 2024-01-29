@@ -23,8 +23,8 @@ def get_data_path(base_dir):
 
 def setup_param_space():
     datasets = [
-        # "fashion-mnist-784-euclidean",
-        # "glove-100-angular",
+        "fashion-mnist-784-euclidean",
+        "glove-100-angular",
         "sald-128-1000000",
         "nytimes-256-angular",
     ]
