@@ -1,10 +1,14 @@
 channels:
   - conda-forge
+  - bioconda
 dependencies:
+  - snakemake
+  - icecream
   - numpy
   - pandas
-  - faiss-cpu
   - h5py
   - tqdm
   - requests
   - seaborn
+  # indices
+  - faiss-cpu
