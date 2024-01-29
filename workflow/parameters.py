@@ -97,6 +97,95 @@ def setup_param_space():
                                     )
     return Paramspace(pd.DataFrame(configs))
 
+def metrics_param_space():
+
+    datasets = [
+        # "fashion-mnist-784-euclidean",
+        # "glove-100-angular",
+        "sald-128-1m",
+        #"nytimes-256-angular",
+        #"sald-128-100m",
+    ]
+
+    queries = {
+        "sald-128-1m": [
+            "sald-128-1k", 
+            # "sald-noise-10", 
+            # "sald-noise-30", 
+            # "sald-noise-50"
+            ],
+        "glove-100-bin": [
+            "glove-noise-0",
+            "glove-noise-10",
+            "glove-noise-30",
+            "glove-noise-50",
+        ],
+    }
+
+    ks = [10]
+
+    configs = []
+
+    for dataset in datasets:
+        for  workload in queries[dataset]:
+            for k in ks:
+                configs.append(
+                    {
+                        "dataset" : dataset,
+                        "queries" : workload,
+                        "k": k,
+                        # "data_samples" : samples[dataset],
+                        # "query_samples" : samples[workload],
+                        # "data_features" : features[dataset],
+                        # "query_features" : features[workload]
+                    }
+                )
+
+    return Paramspace(pd.DataFrame(configs))
+
+def dataset_param_space():
+
+    datasets = [
+        "sald-128-1m",        
+        "sald-128-100m",
+        "sald-128-1k",
+    ]
+
+    samples = {
+        "sald-128-1m" : 1000000,
+        "sald-128-100m" : 100000000,
+        "sald-128-1k" : 1000,
+
+    }
+
+    features = {
+        "sald-128-1m" : 128,
+        "sald-128-100m" : 128,
+        "sald-128-1k" : 128,
+    }
+
+    configs = []
+
+    for dataset in datasets:
+                configs.append(
+                    {
+                        "dataset" : dataset,
+                        "data_samples" : samples[dataset],
+                        "data_features" : features[dataset],
+                    }
+                )
+    return Paramspace(pd.DataFrame(configs))
+
+def get_samples(wildcards):
+
+    samples = {
+        "sald-128-1m" : 1000000,
+        "sald-128-100m" : 100000000,
+        "sald-128-1k" : 1000,
+
+    }
+    return samples[wildcards]
+
 
 if __name__ == "__main__":
     print(setup_param_space())

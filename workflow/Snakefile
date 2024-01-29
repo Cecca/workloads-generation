@@ -55,7 +55,7 @@ min_version("7.24")
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
 import pandas as pd
-from parameters import setup_param_space, get_data_path
+from parameters import setup_param_space, get_data_path, dataset_param_space, metrics_param_space
 
 # This `paramspace` variable is a wrapper around a dataframe
 # that holds all the parameter combinations we want to
@@ -241,14 +241,21 @@ rule eval_metrics:
 #
 ################################################################################
 
+metrics_paramspace = metrics_param_space()
+# print(metrics_paramspace.to_string())
+DATASETS_SIM = set(metrics_paramspace.dataframe['dataset'])
+datasets_meta =  dataset_param_space()
+print(datasets_meta.to_string())
+
 rule metrics_all:
     input:
         expand(
           os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv"),
           #os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
-          # name      = DATASETS,
-          dataset = ["sald-128-1m"], #['fashion-mnist'],
-          queries = ["sald-128-1k"], #['fashion-mnist'],
+          dataset = DATASETS_SIM,
+          queries = {metrics_paramspace.wildcard_pattern},
+          # dataset = ["sald-128-1m"], #['fashion-mnist'],
+          # queries = ["sald-128-1k"], #['fashion-mnist'],
           k = [10]
         )
     output:
@@ -271,7 +278,7 @@ rule eval_all_metrics:
         os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
     threads: workflow.cores / 2
     params:
-        conf = paramspace.instance
+        #conf = paramspace.instance
     run:
         import metrics
         metrics.metrics_csv(
@@ -285,20 +292,24 @@ rule run_messi_shell:
         data = get_data_path(DATA_DIR),
         queries = get_data_path(DATA_DIR),
     output:
-        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt")
+        temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"))
     wildcard_constraints:
         k="[0-9]+"
     params:
+        conf = datasets_meta.instance,
         slength = 128, #todo param
         sax_length = 16,
         sax_card = 8,
         leaf_size = 10000,
-        data_samples = 1000000, # todo: from parse_filename()  or save to params
+        data_samples = 1000000, # todo: from parse_filename()  or messi_paramspace
+        #data_samples = get_samples()
         q_samples = 1000 # todo: from parse_filename()
     threads: workflow.cores / 2
     log:
          os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log")
     run:
+        print(params.conf)
+
         shell("/home/qwang/projects/isax-modularized/build/isax \
 --database_filepath='{input.data}' \
 --query_filepath='{input.queries}' \
@@ -311,7 +322,7 @@ rule run_messi_shell:
 --series_length={params.slength} \
 --adhoc_breakpoints \
 --leaf_size={params.leaf_size} \
---k=1 \
+--k={wildcards.k} \
 --with_id ")
 
         shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> {output} ")
@@ -327,15 +338,23 @@ rule merge_messi:
     wildcard_constraints:
         k="[0-9]+"
     params:
+        conf = datasets_meta.instance,
         slength=128, #todo param
+        data_samples = 1000000,
         sax_length=16,
     run:   
+        #print(params.conf)
+        #print(params.conf['data_samples'])  
+        #print(wildcards['data_samples'])
+        
+
         l = []      
         with open(input['messi']) as f:
             for line in f.readlines():
                 x, y = line.split(" ")
-                l.append(int(params['slength'])*int(x) + int(params['sax_length'])*int(y))
-        #print(l[:5])  
+                # l.append(int(params['slength'])*int(x) + int(params['sax_length'])*int(y))
+                c = (int(params['slength'])*int(x) + int(params['sax_length'])*int(y))/(int(params['slength'])*int(params['data_samples']))
+                l.append(c)
 
         df = pd.read_csv(input['metrics'])    
         df['messi'] = l
