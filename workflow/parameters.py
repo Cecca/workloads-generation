@@ -97,94 +97,151 @@ def setup_param_space():
                                     )
     return Paramspace(pd.DataFrame(configs))
 
-def metrics_param_space():
+# def metrics_param_space():
 
-    datasets = [
-        # "fashion-mnist-784-euclidean",
-        # "glove-100-angular",
-        "sald-128-1m",
-        #"nytimes-256-angular",
-        #"sald-128-100m",
-    ]
+#     datasets = [
+#         # "fashion-mnist-784-euclidean",
+#         # "glove-100-angular",
+#         "sald-128-1m",
+#         #"nytimes-256-angular",
+#         "sald-128-100m",
+#         # "astro-256-100m",
+#         # "deep1b-96-100m",
+#         # "f10-256-100m",
+#         # "f5-256-100m",
+#         # "rw-256-100m",
+#         # "seismic-256-100m",
+#     ]
 
-    queries = {
-        "sald-128-1m": [
-            "sald-128-1k", 
-            # "sald-noise-10", 
-            # "sald-noise-30", 
-            # "sald-noise-50"
-            ],
-        "glove-100-bin": [
-            "glove-noise-0",
-            "glove-noise-10",
-            "glove-noise-30",
-            "glove-noise-50",
-        ],
-    }
+#     queries = {
+#         "sald-128-1m": [
+#             "sald-128-1k", 
+#             # "sald-noise-10", 
+#             # "sald-noise-30", 
+#             # "sald-noise-50"
+#             ],
+#         "sald-128-100m":[
+#             "sald-128-1k", 
+#             # "sald-noise-10", 
+#             # "sald-noise-30", 
+#             # "sald-noise-50"
+#             ],
+#         "glove-100-bin": [
+#             "glove-noise-0",
+#             "glove-noise-10",
+#             "glove-noise-30",
+#             "glove-noise-50",
+#         ],
+#         "astro-256-100m": ["astro-256-1k"],
+#         "deep1b-96-100m":["deep1b-96-1k"],
+#         "f10-256-100m": ["f10-256-1k"],
+#         "f5-256-100m": ["f5-256-1k"],
+#         "rw-256-100m": ["rw-256-1k"],
+#         "seismic-256-100m": ["seismic-256-1k"],
+#     }
 
-    ks = [10]
+#     ks = [10]
 
-    configs = []
+#     configs = []
 
-    for dataset in datasets:
-        for  workload in queries[dataset]:
-            for k in ks:
-                configs.append(
-                    {
-                        "dataset" : dataset,
-                        "queries" : workload,
-                        "k": k,
-                        # "data_samples" : samples[dataset],
-                        # "query_samples" : samples[workload],
-                        # "data_features" : features[dataset],
-                        # "query_features" : features[workload]
-                    }
-                )
+#     for dataset in datasets:
+#         for  workload in queries[dataset]:
+#             for k in ks:
+#                 configs.append(
+#                     {
+#                         "dataset" : dataset,
+#                         "queries" : workload,
+#                         "k": k,
+#                         # "data_samples" : samples[dataset],
+#                         # "query_samples" : samples[workload],
+#                         # "data_features" : features[dataset],
+#                         # "query_features" : features[workload]
+#                     }
+#                 )
 
-    return Paramspace(pd.DataFrame(configs))
+#     return Paramspace(pd.DataFrame(configs))
 
-def dataset_param_space():
+# def dataset_param_space():
 
-    datasets = [
-        "sald-128-1m",        
-        "sald-128-100m",
-        "sald-128-1k",
-    ]
+#     datasets = [
+#         "sald-128-1m",        
+#         "sald-128-100m",
+#         "sald-128-1k",
+#         "astro-256-100m",
+#         "astro-256-1k",
+#         "deep1b-96-100m",
+#         "deep1b-96-1k",
+#         "f10-256-100m",
+#         "f10-256-1k",
+#         "f5-256-100m",
+#         "f5-256-1k",
+#         "rw-256-100m",
+#         "rw-256-1k",
+#         "sald-128-100m",
+#         "sald-128-1k",
+#         "sald-128-1m",
+#         "seismic-256-100m",
+#         "seismic-256-1k",
+#     ]
 
-    samples = {
-        "sald-128-1m" : 1000000,
-        "sald-128-100m" : 100000000,
-        "sald-128-1k" : 1000,
+#     samples = {
+#         "sald-128-1m" : 1000000,
+#         "sald-128-100m" : 100000000,
+#         "sald-128-1k" : 1000,
+#         "astro-256-100m" : 100000000,
+#         "astro-256-1k" : 1000,
+#         "deep1b-96-100m" : 100000000,
+#         "deep1b-96-1k" : 1000,
+#         "f10-256-100m" : 100000000,
+#         "f10-256-1k" : 1000,
+#         "f5-256-100m" : 100000000,
+#         "f5-256-1k" : 1000,
+#         "rw-256-100m" : 100000000,
+#         "rw-256-1k" : 1000,
+#         "seismic-256-100m" : 100000000,
+#         "seismic-256-1k" : 1000,
 
-    }
+#     }
 
-    features = {
-        "sald-128-1m" : 128,
-        "sald-128-100m" : 128,
-        "sald-128-1k" : 128,
-    }
+#     features = {
+#         "sald-128-1m" : 128,
+#         "sald-128-100m" : 128,
+#         "sald-128-1k" : 128,
+#         "astro-256-100m": 256,
+#         "astro-256-1k": 256,
+#         "deep1b-96-100m": 96,
+#         "deep1b-96-1k": 96,
+#         "f10-256-100m": 256,
+#         "f10-256-1k" : 256,
+#         "f5-256-100m" : 256,
+#         "f5-256-1k" : 256,
+#         "rw-256-100m" : 256,
+#         "rw-256-1k" : 256,
+#         "seismic-256-100m" : 256,
+#         "seismic-256-1k" : 256,
+#     }
 
-    configs = []
+#     configs = []
 
-    for dataset in datasets:
-                configs.append(
-                    {
-                        "dataset" : dataset,
-                        "data_samples" : samples[dataset],
-                        "data_features" : features[dataset],
-                    }
-                )
-    return Paramspace(pd.DataFrame(configs))
+#     for dataset in datasets:
+#                 configs.append(
+#                     {
+#                         "dataset" : dataset,
+#                         "data_samples" : samples[dataset],
+#                         "data_features" : features[dataset],
+#                     }
+#                 )
+#     return Paramspace(pd.DataFrame(configs))
 
-def get_samples(wildcards):
+# def get_samples(wildcards):
 
-    samples = {
-        "sald-128-1m" : 1000000,
-        "sald-128-100m" : 100000000,
-        "sald-128-1k" : 1000,
+#     samples = {
+#         "sald-128-1m" : 1000000,
+#         "sald-128-100m" : 100000000,
+#         "sald-128-1k" : 1000,
 
-    }
-    return samples[wildcards]
+#     }
+#     return samples[wildcards]
 
 
 if __name__ == "__main__":
