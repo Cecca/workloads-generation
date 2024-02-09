@@ -366,19 +366,25 @@ rule eval_metrics:
 #
 ################################################################################
 
+configfile: "workflow/config.yaml"
+#print("Config is: ", config)
+
+def get_all_pairs():
+    return [f"{dataset}_{query}"
+        for dataset, dataset_data in config["datasets"].items()
+        for query in dataset_data["queries"]]
+
+print(get_all_pairs())
+
 rule metrics_all:
     input:
         expand(
-          os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv"),
-          #os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
-          # name      = DATASETS,
-          dataset = ["sald-128-1m"], #['fashion-mnist'],
-          queries = ["sald-128-1k"], #['fashion-mnist'],
-          k = [10]
+          os.path.join(RES_DIR,"metrics/messi_{name}_k{k}.csv"),
+          name = get_all_pairs(),
+          k = [10]  
         )
     output:
         os.path.join(RES_DIR,"metrics/metrics-messi-all.csv")
-        # os.path.join(RES_DIR,"metrics/metrics-all.csv")
     threads: workflow.cores / 2
     wildcard_constraints:
         k="[0-9]+"
@@ -390,13 +396,13 @@ rule metrics_all:
 
 rule eval_all_metrics:
     input:
-        data = os.path.join(DATA_DIR, "{dataset}.bin"),  #  extend with multiple extensions
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
         queries = os.path.join(DATA_DIR, "{queries}.bin"),
+        # data = get_data_path(DATA_DIR),
+        # queries = get_data_path(DATA_DIR),
     output:
         os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
     threads: workflow.cores / 2
-    params:
-        conf = paramspace.instance
     run:
         import metrics
         metrics.metrics_csv(
@@ -405,42 +411,44 @@ rule eval_all_metrics:
           output[0],
           int(wildcards['k']))
 
+
 rule run_messi_shell:
     input:
-        data = get_data_path(DATA_DIR),
-        queries = get_data_path(DATA_DIR),
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        queries = os.path.join(DATA_DIR, "{queries}.bin"),
+        # data = get_data_path(DATA_DIR),
+        # queries = get_data_path(DATA_DIR),
     output:
-        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt")
+        temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"))
     wildcard_constraints:
         k="[0-9]+"
-    params:
-        slength = 128, #todo param
-        sax_length = 16,
-        sax_card = 8,
-        leaf_size = 10000,
-        data_samples = 1000000, # todo: from parse_filename()  or save to params
-        q_samples = 1000 # todo: from parse_filename()
     threads: workflow.cores / 2
     log:
-         os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log")
+         temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log"))
     run:
+
+        slength = config["features"][wildcards.dataset]
+        data_samples = config["samples"][wildcards.dataset]
+        q_samples = config["samples"][wildcards.queries]    
+
         shell("/home/qwang/projects/isax-modularized/build/isax \
 --database_filepath='{input.data}' \
 --query_filepath='{input.queries}' \
---database_size={params.data_samples} \
---query_size={params.q_samples} \
---sax_length={params.sax_length} \
---sax_cardinality={params.sax_card} \
---cpu_cores=4 \
+--database_size={data_samples} \
+--query_size={q_samples} \
+--sax_length={config[sax_length]} \
+--sax_cardinality={config[sax_card]} \
+--cpu_cores={config[cpu_cores]} \
 --log_filepath='{log}' \
---series_length={params.slength} \
+--series_length={slength} \
 --adhoc_breakpoints \
---leaf_size={params.leaf_size} \
---k=1 \
+--leaf_size={config[leaf_size]} \
+--k={wildcards.k} \
 --with_id ")
 
         shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> {output} ")
         #shell("rm {log}")
+
 
 # add messi output to other metrics.csv
 rule merge_messi:
@@ -451,22 +459,21 @@ rule merge_messi:
         os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv")
     wildcard_constraints:
         k="[0-9]+"
-    params:
-        slength=128, #todo param
-        sax_length=16,
-    run:   
+    run:          
+        slength = config["features"][wildcards.dataset]
+        data_samples = config["samples"][wildcards.dataset]
+
         l = []      
         with open(input['messi']) as f:
             for line in f.readlines():
                 x, y = line.split(" ")
-                l.append(int(params['slength'])*int(x) + int(params['sax_length'])*int(y))
-        #print(l[:5])  
+                c = (slength*int(x) + config['sax_length']*int(y))/(slength*data_samples)
+                l.append(c)
 
         df = pd.read_csv(input['metrics'])    
         df['messi'] = l
         df.to_csv(output[0], index=False)
 
-        # shell('rm {input.messi}')
 
 # todo: rule to add noise to queries if not exists 
 
