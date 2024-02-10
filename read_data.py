@@ -5,29 +5,29 @@ import requests
 from utils import compute_distances
 import sys
 
-DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") #/mnt/hddhelp/workgen_data/
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")  # /mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 
-dataset_path="/data/qwang/datasets/" # TODO: simlinks in /mnt/hddhelp/workgen_data/
-sald_noise_path="/mnt/hddhelp/ts_benchmarks/datasets/sald/"
+dataset_path = "/data/qwang/datasets/"  # TODO: simlinks in /mnt/hddhelp/workgen_data/
+sald_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/sald/"
 glove_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/"
 
 DATASETS = {
-"astro": f"{dataset_path}astro-256-100m.bin",
-"deep1b": f"{dataset_path}deep1b-96-100m.bin",
-"f10": f"{dataset_path}f10-256-100m.bin",
-"f5": f"{dataset_path}f5-256-100m.bin",
-"rw": f"{dataset_path}rw-256-100m.bin",
-"seismic": f"{dataset_path}seismic-256-100m.bin",
-"sald": f"{dataset_path}sald-128-100m.bin",
-"fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
-"glove-100": "glove-100-angular.hdf5",
-"glove-25": "glove-25-angular.hdf5",
-"glove-200": "glove-200-angular.hdf5",
-"mnist": "mnist-784-euclidean.hdf5",
-"sift": "sift-128-euclidean.hdf5",
-"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
-"sald-small": f"{DATA_DIR}sald-128-1m.bin",
+    "astro": f"{dataset_path}astro-256-100m.bin",
+    "deep1b": f"{dataset_path}deep1b-96-100m.bin",
+    "f10": f"{dataset_path}f10-256-100m.bin",
+    "f5": f"{dataset_path}f5-256-100m.bin",
+    "rw": f"{dataset_path}rw-256-100m.bin",
+    "seismic": f"{dataset_path}seismic-256-100m.bin",
+    "sald": f"{dataset_path}sald-128-100m.bin",
+    "fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
+    "glove-100": "glove-100-angular.hdf5",
+    "glove-25": "glove-25-angular.hdf5",
+    "glove-200": "glove-200-angular.hdf5",
+    "mnist": "mnist-784-euclidean.hdf5",
+    "sift": "sift-128-euclidean.hdf5",
+    "glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
+    "sald-small": f"{DATA_DIR}sald-128-1m.bin",
 }
 
 WORKLOADS = {
@@ -172,8 +172,8 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
     if with_padding:
         dim = data.shape[1]
         padsize = (8 - (dim % 8)) % 8
-        print("Padding with", padsize, "dimensions")
         if padsize > 0:
+            print("Padding with", padsize, "dimensions")
             padding = np.zeros((data.shape[0], padsize), dtype=np.float32)
             data = np.hstack([data, padding])
     if fname_check:
@@ -189,7 +189,7 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
     # check that the conversion produced the same files
     base, _ = read_multiformat(input_path, what)
     converted, _ = read_multiformat(output_path, what)
-    if padsize is not None:
+    if padsize is not None and padsize > 0:
         converted = converted[:, :-padsize]
     assert np.all(
         np.isclose(base, converted)
