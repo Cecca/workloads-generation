@@ -430,8 +430,6 @@ rule run_messi_shell:
         slength = config["features"][wildcards.dataset]
         data_samples = config["samples"][wildcards.dataset]
         q_samples = config["samples"][wildcards.queries]    
-        print(slength, data_samples, q_samples)
-        print(input["data"])
 
         shell("/home/qwang/projects/isax-modularized/build/isax \
 --database_filepath='{input.data}' \
