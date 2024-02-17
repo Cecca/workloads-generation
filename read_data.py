@@ -147,7 +147,7 @@ def read_multiformat(name, what, data_limit=None):
             _download_ann_benchmarks(path)
         data, distance_metric = read_hdf5(path, what, data_limit)
     elif path.endswith(".bin"):
-        data_samples, data_features, distance_metric = parse_filename(path)
+        _, data_samples, data_features, distance_metric = parse_filename(path)
 
         if data_limit is None:
             data_limit = data_samples
@@ -177,7 +177,7 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
             data = np.hstack([data, padding])
     if fname_check:
         actual_n, actual_dim = data.shape
-        expected_n, expected_dim, distance_metric = parse_filename(output_path)
+        _, expected_n, expected_dim, distance_metric = parse_filename(output_path)
         assert (
             actual_dim == expected_dim
         ), f"The output file should be named appropriately, i.e. it should contain the number of dimensions ({actual_dim}) in the filename"
@@ -191,7 +191,7 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
     # check that the conversion produced the same files
     base, _ = read_multiformat(input_path, what)
     converted, _ = read_multiformat(output_path, what)
-    if padsize is not None:
+    if padsize is not None and padsize > 0:
         converted = converted[:, :-padsize]
     assert np.all(
         np.isclose(base, converted)
@@ -227,5 +227,6 @@ def parse_filename(filepath):
         distance_metric = file_arr[-3]
     else:
         distance_metric = "euclidean"
+    name = file_arr[0]
 
-    return samples, features, distance_metric
+    return name, samples, features, distance_metric

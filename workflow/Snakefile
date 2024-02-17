@@ -488,6 +488,32 @@ rule prepare_data_file:
         name = wildcards["name"]
         read_data.download(f"https://ann-benchmarks.com/{name}.hdf5", output[0])
 
+
+rule convert_annbench_to_bin:
+    output:
+        expand(
+            os.path.join(DATA_DIR, "{name}.bin"),
+            name=[
+                "fashion_mnist-euclidean-784-60K",
+                "glove-angular-32-1183514",
+                "glove-angular-104-1183514",
+                "nytimes-angular-256-289761",
+            ]
+        )
+    
+    run:
+        import read_data
+        features_map = {32: 25, 104: 100}
+        for o in output:
+            name, samples, features, distance_metric = read_data.parse_filename(o)
+            name = name.replace("_", "-")
+            ann_feats = features_map.get(features, features)
+            ann_bench_name = f"{name}-{ann_feats}-{distance_metric}"
+            tmp = os.path.join(DATA_DIR, f"{ann_bench_name}.hdf5")
+            read_data.download(f"https://ann-benchmarks.com/{ann_bench_name}.hdf5", tmp)
+            read_data.hdf5_to_bin(tmp, o, "train")
+
+
 rule run_messi_one:
 	output:
 		"messi_results_config{index}.txt"

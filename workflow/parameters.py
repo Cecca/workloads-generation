@@ -37,10 +37,10 @@ def workloads():
     workloads_dict = dict()
 
     datasets = [
-        "fashion-mnist-784-euclidean",
-        "glove-100-angular",
-        "sald-128-1000000",
-        "nytimes-256-angular",
+        "fashion_mnist-euclidean-784-60K",
+        "glove-angular-32-1183514",
+        "glove-angular-104-1183514",
+        "nytimes-angular-256-289761",
     ]
 
     # Simulated annealing synthetic queries
