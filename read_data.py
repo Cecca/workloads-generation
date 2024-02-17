@@ -5,29 +5,29 @@ import requests
 from utils import compute_distances
 import sys
 
-DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") #/mnt/hddhelp/workgen_data/
+DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")  # /mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 
-dataset_path="/data/qwang/datasets/" # TODO: simlinks in /mnt/hddhelp/workgen_data/
-sald_noise_path="/mnt/hddhelp/ts_benchmarks/datasets/sald/"
+dataset_path = "/data/qwang/datasets/"  # TODO: simlinks in /mnt/hddhelp/workgen_data/
+sald_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/sald/"
 glove_noise_path = "/mnt/hddhelp/ts_benchmarks/datasets/annbench/glove100/"
 
 DATASETS = {
-"astro": f"{dataset_path}astro-256-100m.bin",
-"deep1b": f"{dataset_path}deep1b-96-100m.bin",
-"f10": f"{dataset_path}f10-256-100m.bin",
-"f5": f"{dataset_path}f5-256-100m.bin",
-"rw": f"{dataset_path}rw-256-100m.bin",
-"seismic": f"{dataset_path}seismic-256-100m.bin",
-"sald": f"{dataset_path}sald-128-100m.bin",
-"fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
-"glove-100": "glove-100-angular.hdf5",
-"glove-25": "glove-25-angular.hdf5",
-"glove-200": "glove-200-angular.hdf5",
-"mnist": "mnist-784-euclidean.hdf5",
-"sift": "sift-128-euclidean.hdf5",
-"glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
-"sald-small": f"{DATA_DIR}sald-128-1m.bin",
+    "astro": f"{dataset_path}astro-256-100m.bin",
+    "deep1b": f"{dataset_path}deep1b-96-100m.bin",
+    "f10": f"{dataset_path}f10-256-100m.bin",
+    "f5": f"{dataset_path}f5-256-100m.bin",
+    "rw": f"{dataset_path}rw-256-100m.bin",
+    "seismic": f"{dataset_path}seismic-256-100m.bin",
+    "sald": f"{dataset_path}sald-128-100m.bin",
+    "fashion-mnist": "fashion-mnist-784-euclidean.hdf5",
+    "glove-100": "glove-100-angular.hdf5",
+    "glove-25": "glove-25-angular.hdf5",
+    "glove-200": "glove-200-angular.hdf5",
+    "mnist": "mnist-784-euclidean.hdf5",
+    "sift": "sift-128-euclidean.hdf5",
+    "glove-100-bin": f"{glove_noise_path}glove-100-1183514-angular.bin",
+    "sald-small": f"{DATA_DIR}sald-128-1m.bin",
 }
 
 WORKLOADS = {
@@ -147,7 +147,7 @@ def read_multiformat(name, what, data_limit=None):
             _download_ann_benchmarks(path)
         data, distance_metric = read_hdf5(path, what, data_limit)
     elif path.endswith(".bin"):
-        data_samples, data_features = parse_filename(path)
+        data_samples, data_features, distance_metric = parse_filename(path)
 
         if data_limit is None:
             data_limit = data_samples
@@ -155,7 +155,6 @@ def read_multiformat(name, what, data_limit=None):
         data = np.fromfile(
             path, dtype="float32", count=data_features * data_limit
         ).reshape(data_limit, data_features)
-        distance_metric = "euclidean"
     else:
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit()
@@ -168,7 +167,7 @@ def read_multiformat(name, what, data_limit=None):
 
 def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=True):
     assert what in ["train", "test"]
-    data, _ = read_hdf5(input_path, what)
+    data, input_distance_metric = read_hdf5(input_path, what)
     if with_padding:
         dim = data.shape[1]
         padsize = (8 - (dim % 8)) % 8
@@ -178,13 +177,16 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
             data = np.hstack([data, padding])
     if fname_check:
         actual_n, actual_dim = data.shape
-        expected_n, expected_dim = parse_filename(output_path)
+        expected_n, expected_dim, distance_metric = parse_filename(output_path)
         assert (
             actual_dim == expected_dim
         ), f"The output file should be named appropriately, i.e. it should contain the number of dimensions ({actual_dim}) in the filename"
         assert (
             actual_n == expected_n
         ), f"The output file should be named appropriately, i.e. it should contain the number of points ({actual_n}) in the filename"
+        assert (
+            input_distance_metric == distance_metric,
+        ), f"The output file should be named appropriately, i.e. it should contain the distance metric ({input_distance_metric}) in the filename"
     data.tofile(output_path)
     # check that the conversion produced the same files
     base, _ = read_multiformat(input_path, what)
@@ -207,10 +209,23 @@ def str_to_digits(sids_str):
 
 
 def parse_filename(filepath):
+    """Parse the filename for metadata.
+
+    Given a *.bin file, parse its filename to extract metadata:
+
+        /some/path/to/name-[distance_metric]-features-samples.bin
+
+    where `distance_metric` defaults to `euclidean` if missing.
+    """
     # parse sdim and sids /path/to/file/deep1b-96-1k.bin
     file = filepath.rsplit("/", 1)[1].split(".")[0]
     file_arr = file.split("-")
-    samples = str_to_digits(file_arr[2])
-    features = int(file_arr[1])
+    assert len(file_arr) >= 3
+    samples = str_to_digits(file_arr[-1])
+    features = int(file_arr[-2])
+    if len(file_arr) >= 4:
+        distance_metric = file_arr[-3]
+    else:
+        distance_metric = "euclidean"
 
-    return samples, features
+    return samples, features, distance_metric
