@@ -55,7 +55,7 @@ min_version("7.24")
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
 import pandas as pd
-from parameters import setup_param_space, get_data_path
+from parameters import workloads, get_data_path, setup_param_space
 
 # This `paramspace` variable is a wrapper around a dataframe
 # that holds all the parameter combinations we want to
@@ -63,11 +63,62 @@ from parameters import setup_param_space, get_data_path
 # function in setup_param_space().
 # More on this here: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#parameter-space-exploration
 paramspace = setup_param_space()
+WORKLOADS= workloads()
 
 # For convenience, here we extract the set of datasets we
 # use in this evaluation.
 DATASETS = set(paramspace.dataframe['dataset'])
 BIN_CONFIGS = pd.read_csv("workflow/bin_configs.csv")['Config'].values
+
+
+rule all:
+    input:
+        os.path.join(
+            GENERATED_DIR, 
+            "dataset~fashion_mnist-euclidean-784-60K/workload_key~714b27bee35b9d9eb6fd89f9cd22c756794c7990a8e5aa14ab677e242c0a8a6d/fashion_mnist-euclidean-784-3.bin"
+        )
+
+# Here we generate synthetic workloads sets
+rule generate_synthetic:
+    input:
+        os.path.join(DATA_DIR, "{dataset}.bin")
+    output:
+        os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}.bin"
+        ),
+    threads: workflow.cores
+    run:
+        import workflow.parameters as wparams
+        import generate
+        import logging
+        import sys
+        import os
+        logging.basicConfig(level=logging.INFO)
+
+        workloads = wparams.workloads()
+        
+        workload_config = workloads.config_for( wildcards["workload_key"] )
+
+        workload_type = workload_config["workload_type"]
+        if workload_type == "synthetic-simulated-annealing":
+            print(workload_config)
+            generate.generate_workload_annealing(
+              input[0],
+              output[0],
+              k = int(workload_config['k']),
+              metric = workload_config["metric"],
+              target_low = float(workload_config['target_low']),
+              target_high = float(workload_config['target_high']),
+              num_queries = int(workload_config['num_queries']),
+              scale = float(workload_config['scale']),
+              initial_temperature = int(workload_config['initial_temperature']),
+              max_steps = 10000,
+              threads = threads,
+            )
+        else:
+            raise ValueError(f"unknown workload type {workload_type}")
+
+
 
 # This rule plots the number of distance computations against
 # the RC metric for different datasets, coloring points
@@ -302,36 +353,6 @@ rule faiss_hnsw_synthetic:
         df.to_csv(output[0], index=False)
 
 
-# Here we generate syntehtic query sets, guided by the
-# relative contrast metric
-rule generate_synthetic:
-    input:
-        #os.path.join(DATA_DIR, "{dataset}.hdf5")
-        get_data_path(DATA_DIR)
-    output:
-        os.path.join(GENERATED_DIR, 
-          f"{paramspace.wildcard_pattern}.hdf5"
-        ),
-    threads: workflow.cores
-    params:
-        paramspace.instance
-    run:
-        import generate
-        import logging
-        logging.basicConfig(level=logging.INFO)
-        generate.generate_workload_annealing(
-          input[0],
-          output[0],
-          k = int(wildcards['k']),
-          metric = wildcards["difficulty"],
-          target_low = float(wildcards['target_lower']),
-          target_high = float(wildcards['target_upper']),
-          num_queries = int(wildcards['num_queries']),
-          scale = float(wildcards['scale']),
-          initial_temperature = int(wildcards['initial_temperature']),
-          max_steps = 10000,
-          threads = threads
-        )
 
 
 # And finally here we compute the metrics of the synthetic

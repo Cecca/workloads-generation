@@ -27,6 +27,7 @@ def generate_queries_annealing(
     initial_temperature=10,
     seed=1234,
     threads=os.cpu_count(),
+    **kwargs,
 ):
     gen = np.random.default_rng(seed)
 

@@ -24,6 +24,31 @@ def get_data_path(base_dir):
     return inner
 
 
+class WorkloadPatterns:
+    def __init__(self, configs, workloads_dict):
+        self._configs = configs
+        self._workloads_dict = workloads_dict
+        self._wildcard_pattern = (
+            "dataset~{dataset}/workload_key~{workload_key}/{workload_file}"
+        )
+        self._patterns = [self.wildcard_pattern.format(**c) for c in self._configs]
+
+    def config_for(self, key):
+        return self._workloads_dict[key]
+
+    @property
+    def wildcard_pattern(self):
+        return self._wildcard_pattern
+
+    @property
+    def instance_patterns(self):
+        return self._patterns
+
+    @property
+    def workloads_dict(self):
+        return self._workloads_dict
+
+
 def workloads():
     """Builds the configuration of all workloads that we use in our experiments.
 
@@ -32,6 +57,12 @@ def workloads():
     workload identifiers (used in the paths as part of the wildcard)
     and the values are dictionaries holding the workload configuration.
     """
+    import sys
+    import os
+
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+    import read_data as rd
 
     configs = []
     workloads_dict = dict()
@@ -45,26 +76,29 @@ def workloads():
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
-    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.1, 0.3]]
+    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05]]
     target_difficulty = {
         "faiss_ivf": {
-            "fashion-mnist-784-euclidean": faiss_ivf_difficulties,
-            "glove-100-angular": faiss_ivf_difficulties,
+            "fashion_mnist-euclidean-784-60K": faiss_ivf_difficulties,
+            "glove-angular-104-1183514": faiss_ivf_difficulties,
+            "glove-angular-32-1183514": faiss_ivf_difficulties,
             "sald-128-1000000": faiss_ivf_difficulties,
-            "nytimes-256-angular": faiss_ivf_difficulties,
+            "nytimes-angular-256-289761": faiss_ivf_difficulties,
         },
     }
     scales = {
-        "fashion-mnist-784-euclidean": [10],
-        "glove-100-angular": [0.1],
+        "fashion_mnist-euclidean-784-60K": [10],
+        "glove-angular-32-1183514": [0.1],
+        "glove-angular-104-1183514": [0.1],
         "sald-128-1000000": [10],
-        "nytimes-256-angular": [0.1],
+        "nytimes-angular-256-289761": [0.1],
     }
     initial_temperature = {
-        "fashion-mnist-784-euclidean": [10],
-        "glove-100-angular": [1],
+        "fashion_mnist-euclidean-784-60K": [10],
+        "glove-angular-32-1183514": [1],
+        "glove-angular-104-1183514": [1],
         "sald-128-1000000": [10],
-        "nytimes-256-angular": [1],
+        "nytimes-angular-256-289761": [1],
     }
 
     num_queries = [3]
@@ -84,17 +118,26 @@ def workloads():
                     "dataset": dataset,
                     "k": k,
                     "num_queries": nq,
-                    "difficulty": tf,
-                    "target_lower": lower,
-                    "target_upper": upper,
+                    "metric": tf,
+                    "target_low": lower,
+                    "target_high": upper,
                     "scale": scale,
                     "initial_temperature": temp,
                 }
                 key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
                 workloads_dict[key] = conf
-                configs.append({"dataset": dataset, "workload_key": key})
+                dname, _, features, distance_metric = rd.parse_filename(dataset)
+                workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
+                configs.append(
+                    {
+                        "dataset": dataset,
+                        "workload_key": key,
+                        "workload_file": workload_fname,
+                    }
+                )
 
-    return Paramspace(pd.DataFrame(configs)), workloads_dict
+    # return Paramspace(pd.DataFrame(configs)), workloads_dict
+    return WorkloadPatterns(configs, workloads_dict)
 
 
 def setup_param_space():

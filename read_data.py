@@ -218,7 +218,7 @@ def parse_filename(filepath):
     where `distance_metric` defaults to `euclidean` if missing.
     """
     # parse sdim and sids /path/to/file/deep1b-96-1k.bin
-    file = filepath.rsplit("/", 1)[1].split(".")[0]
+    file = filepath.rsplit("/", 1)[-1].split(".")[0]
     file_arr = file.split("-")
     assert len(file_arr) >= 3
     samples = str_to_digits(file_arr[-1])
