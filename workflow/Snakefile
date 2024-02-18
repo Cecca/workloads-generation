@@ -74,8 +74,14 @@ BIN_CONFIGS = pd.read_csv("workflow/bin_configs.csv")['Config'].values
 rule all:
     input:
         os.path.join(
-            GENERATED_DIR, 
-            "dataset~fashion_mnist-euclidean-784-60K/workload_key~714b27bee35b9d9eb6fd89f9cd22c756794c7990a8e5aa14ab677e242c0a8a6d/fashion_mnist-euclidean-784-3.bin"
+            RES_DIR,
+            "plots",
+            "all-metrics.png"
+        ),
+        os.path.join(
+            RES_DIR,
+            "metrics",
+            f"faiss_hnsw/{WORKLOADS.instance_patterns[0]}/results.csv"
         )
 
 # Here we generate synthetic workloads sets
@@ -98,7 +104,6 @@ rule generate_synthetic:
         workloads = wparams.workloads()
         
         workload_config = workloads.config_for( wildcards["workload_key"] )
-
         workload_type = workload_config["workload_type"]
         if workload_type == "synthetic-simulated-annealing":
             print(workload_config)
@@ -106,7 +111,7 @@ rule generate_synthetic:
               input[0],
               output[0],
               k = int(workload_config['k']),
-              metric = workload_config["metric"],
+              metric = workload_config["difficulty"],
               target_low = float(workload_config['target_low']),
               target_high = float(workload_config['target_high']),
               num_queries = int(workload_config['num_queries']),
@@ -119,15 +124,59 @@ rule generate_synthetic:
             raise ValueError(f"unknown workload type {workload_type}")
 
 
+# And finally here we compute the metrics of the synthetic
+# query sets
+rule eval_metrics:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        queries =
+          os.path.join(GENERATED_DIR, 
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
+    output:
+        os.path.join(RES_DIR, f"metrics/{WORKLOADS.wildcard_pattern}.csv"),
+    run:
+        import workflow.parameters as wparams
+        import metrics
+
+        workloads = wparams.workloads()
+
+        workload_config = workloads.config_for( wildcards["workload_key"] )
+        workload_descr = workloads.description_for(wildcards["workload_key"])
+
+        metrics.metrics_csv(
+          input['data'],
+          input['queries'],
+          output[0],
+          workload_config['k'],
+          additional_header = ["dataset", "workload_description"],
+          additional_row = [workload_config['dataset'], workload_descr]
+        )
+
+
+# Here we bring in a single csv file the metrics computed
+# on the syntehtic query sets
+rule eval_metrics_concat:
+    input:
+        metrics = expand(
+          os.path.join(RES_DIR, "metrics", "{params}.csv"),
+          params=WORKLOADS.instance_patterns
+        )
+    output:
+        "results/metrics/all-metrics.csv"
+    run:
+        import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
+        df.to_csv(output[0], index=False)
 
 # This rule plots the number of distance computations against
 # the RC metric for different datasets, coloring points
 # according to their "difficulty group"
-rule plot_synthetic_difficulty:
+rule plot_difficulty:
     input:
-        metrics = "results/metrics/all-synthetic.csv"
+        metrics = "results/metrics/all-metrics.csv"
     output:
-        "results/plots/synthetic-difficulty.png"
+        "results/plots/all-metrics.png"
     run:
         import matplotlib
         matplotlib.use("Agg")
@@ -137,18 +186,20 @@ rule plot_synthetic_difficulty:
         import pandas as pd
 
         df = pd.read_csv(input["metrics"])
-        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
-        averages = df.groupby(["dataset", "target", "target_metric"]).mean().reset_index()
-        print(averages[["dataset", "target", "distcomp", "rc_10", "lid_10"]])
+        print(df)
+        averages = df.groupby(["dataset", "workload_description"]).mean().reset_index()
 
         (
-          so.Plot(df, y="lid_10", x="distcomp", color="target")
+          so.Plot(df,
+                  y="distcomp",
+                  x="workload_description",
+                  color="workload_description")
             .facet("dataset")
             .add(so.Dot())
-            #.add(so.Dot(color="black"), data=averages)
             .save(output[0])
         )
 
+# FIXME: remove
 rule plot_synthetic_runtime:
     input:
         "results/metrics/all-synthetic-runtime.csv"
@@ -178,6 +229,7 @@ rule plot_synthetic_runtime:
 
 # This task computes the CSV file for the metrics
 # of the queries builtin each dataset.
+# FIXME: remove
 rule metrics_builtin_queries:
     input:
         expand(
@@ -194,6 +246,7 @@ rule metrics_builtin_queries:
         df.to_csv(output[0], index=False)
 
 
+# FIXME: remove
 rule plot_ann_bench_distcomps:
     input:
         "results/metrics/all-builtin.csv"
@@ -223,6 +276,7 @@ rule plot_ann_bench_distcomps:
 
 # Here we compute the metrics for each individual dataset, this
 # a subtask of `metrics_builtin_queries`
+# FIXME: remove
 rule eval_metrics_builtin_queries:
     input:
         get_data_path(DATA_DIR)
@@ -240,63 +294,57 @@ rule eval_metrics_builtin_queries:
         )
 
 
-# Here we bring in a single csv file the metrics computed
-# on the syntehtic query sets
-rule synthetic_metrics:
-    input:
-        metrics = expand(
-          "results/metrics/{params}.csv",
-          params=paramspace.instance_patterns
-        )
-    output:
-        "results/metrics/all-synthetic.csv"
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
-        df.to_csv(output[0], index=False)
 
 
 # Brings together the information from metrics and index runtime evaluation
-rule eval_runtime:
-    input:
-        metrics = f"results/metrics/{paramspace.wildcard_pattern}.csv",
-        faiss_hnsw = f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
-    output:
-        f"results/metrics/runtime/{paramspace.wildcard_pattern}.csv",
-    run:
-        import pandas as pd
-        metrics = pd.read_csv(input["metrics"]).rename({"i": "query_index"}, axis=1)
-        faiss_runtime = pd.read_csv(input["faiss_hnsw"])
-        df = pd.merge(metrics, faiss_runtime)
-        df.to_csv(output[0], index=False)
+#rule eval_runtime:
+#    input:
+#        metrics = f"results/metrics/{paramspace.wildcard_pattern}.csv",
+#        faiss_hnsw = f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
+#    output:
+#        f"results/metrics/runtime/{paramspace.wildcard_pattern}.csv",
+#    run:
+#        import pandas as pd
+#        metrics = pd.read_csv(input["metrics"]).rename({"i": "query_index"}, axis=1)
+#        faiss_runtime = pd.read_csv(input["faiss_hnsw"])
+#        df = pd.merge(metrics, faiss_runtime)
+#        df.to_csv(output[0], index=False)
+#
+#
+## Brings together all the metrics and the runtime evaluations of different indices
+## FIXME: rename it to something line "merge-all"
+#rule eval_runtime_all:
+#    input:
+#        expand(
+#          "results/metrics/runtime/{params}.csv",
+#          params=paramspace.instance_patterns
+#        )
+#    output:
+#        "results/metrics/all-synthetic-runtime.csv"
+#    run:
+#        import pandas as pd
+#        df = pd.concat((pd.read_csv(f) for f in input))
+#        df.to_csv(output[0], index=False)
 
-
-# Brings together all the metrics and the runtime evaluations of different indices
-# FIXME: keep only one between this and synthetic_metrics
-rule eval_runtime_all:
-    input:
-        expand(
-          "results/metrics/runtime/{params}.csv",
-          params=paramspace.instance_patterns
-        )
-    output:
-        "results/metrics/all-synthetic-runtime.csv"
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
-
+######################################################################
+#
+# Indices
+#
+######################################################################
 
 # Run faiss_hnsw on the synthetic datasets
-rule faiss_hnsw_synthetic:
+rule faiss_hnsw:
     input:
-        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
-        queries =
-          os.path.join(GENERATED_DIR, 
-            f"{paramspace.wildcard_pattern}.hdf5"
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
           ),
     output:
-        f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
+        os.path.join(
+          RES_DIR, 
+          f"metrics/faiss_hnsw/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
     run:
         import read_data
         import faiss
@@ -305,9 +353,10 @@ rule faiss_hnsw_synthetic:
         import pandas as pd
         import json
 
-        k = int(wildcards["k"])
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
-        queryset, _ = read_data.read_multiformat(input["queries"], "test")
+        queryset, _ = read_data.read_multiformat(input["workload"], "test")
         print("Populating index")
         index_params = "HNSW32"
         index = faiss.index_factory(dataset.shape[1], index_params)
@@ -355,29 +404,6 @@ rule faiss_hnsw_synthetic:
 
 
 
-# And finally here we compute the metrics of the synthetic
-# query sets
-rule eval_metrics:
-    input:
-        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
-        queries =
-          os.path.join(GENERATED_DIR, 
-            f"{paramspace.wildcard_pattern}.hdf5"
-          ),
-    output:
-        f"results/metrics/{paramspace.wildcard_pattern}.csv",
-    params:
-        conf = paramspace.instance
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input['data'],
-          input['queries'],
-          output[0],
-          int(wildcards['k']),
-          additional_header = ["dataset", "target_low", "target_high", "target_metric"],
-          additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
-        )
 
 ################################################################################
 #

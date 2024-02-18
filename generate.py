@@ -27,7 +27,6 @@ def generate_queries_annealing(
     initial_temperature=10,
     seed=1234,
     threads=os.cpu_count(),
-    **kwargs,
 ):
     gen = np.random.default_rng(seed)
 
@@ -609,7 +608,8 @@ def generate_workload_annealing(
         threads,
     )
 
-    write_queries_hdf5(queries, queries_output)
+    # write_queries_hdf5(queries, queries_output)
+    queries.tofile(queries_output)
 
 
 def main():

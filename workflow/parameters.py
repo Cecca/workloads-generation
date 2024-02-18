@@ -33,6 +33,17 @@ class WorkloadPatterns:
         )
         self._patterns = [self.wildcard_pattern.format(**c) for c in self._configs]
 
+    def description_for(self, key):
+        config = self.config_for(key)
+        workload_type = config["workload_type"]
+        if workload_type == "synthetic-simulated-annealing":
+            metric = config["difficulty"]
+            low = config["target_low"]
+            high = config["target_high"]
+            return f"Annealing({metric}, {low:.2f}, {high:.2f})"
+        else:
+            raise KeyError(f"unknown workload type {workload_type}")
+
     def config_for(self, key):
         return self._workloads_dict[key]
 
@@ -70,13 +81,13 @@ def workloads():
     datasets = [
         "fashion_mnist-euclidean-784-60K",
         "glove-angular-32-1183514",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
     ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
-    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05]]
+    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.4]]
     target_difficulty = {
         "faiss_ivf": {
             "fashion_mnist-euclidean-784-60K": faiss_ivf_difficulties,
@@ -118,7 +129,7 @@ def workloads():
                     "dataset": dataset,
                     "k": k,
                     "num_queries": nq,
-                    "metric": tf,
+                    "difficulty": tf,
                     "target_low": lower,
                     "target_high": upper,
                     "scale": scale,
