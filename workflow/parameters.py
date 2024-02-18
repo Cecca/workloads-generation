@@ -78,6 +78,8 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
+    # TODO: add builtin queries, including the ones that are not generated
+
     datasets = [
         "fashion_mnist-euclidean-784-60K",
         "glove-angular-32-1183514",

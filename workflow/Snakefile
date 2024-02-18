@@ -50,7 +50,7 @@ MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modul
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
-min_version("7.24")
+min_version("8.4")
 
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
@@ -81,6 +81,12 @@ rule all:
         ),
         os.path.join(RES_DIR, "metrics", "index-performance.csv")
 
+######################################################################
+#
+# Workload generation
+#
+######################################################################
+
 # Here we generate synthetic workloads sets
 rule generate_synthetic:
     input:
@@ -98,9 +104,7 @@ rule generate_synthetic:
         import os
         logging.basicConfig(level=logging.INFO)
 
-        workloads = wparams.workloads()
-        
-        workload_config = workloads.config_for( wildcards["workload_key"] )
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         workload_type = workload_config["workload_type"]
         if workload_type == "synthetic-simulated-annealing":
             print(workload_config)
@@ -136,10 +140,8 @@ rule eval_metrics:
         import workflow.parameters as wparams
         import metrics
 
-        workloads = wparams.workloads()
-
-        workload_config = workloads.config_for( wildcards["workload_key"] )
-        workload_descr = workloads.description_for(wildcards["workload_key"])
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        workload_descr = WORKLOADS.description_for(wildcards["workload_key"])
 
         metrics.metrics_csv(
           input['data'],
@@ -196,139 +198,11 @@ rule plot_difficulty:
             .save(output[0])
         )
 
-# FIXME: remove
-rule plot_synthetic_runtime:
-    input:
-        "results/metrics/all-synthetic-runtime.csv"
-    output:
-        "results/plots/synthetic-difficulty-runtime.png"
-    run:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-        import seaborn as sns
-        import seaborn.objects as so
-        import pandas as pd
-
-        df = pd.read_csv(input[0])
-        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
-        print(df.columns)
-        averages = df.groupby(["dataset", "target", "target_metric"])[["time_s"]].mean().reset_index()
-
-        (
-          so.Plot(df, y="time_s", x="target")
-            .facet("dataset")
-            .add(so.Dot())
-            .add(so.Dot(color="black"), data=averages)
-            .save(output[0])
-        )
-
-
-# This task computes the CSV file for the metrics
-# of the queries builtin each dataset.
-# FIXME: remove
-rule metrics_builtin_queries:
-    input:
-        expand(
-          "results/metrics/{name}-k{k}.csv",
-          name      = DATASETS,
-          k         = [10]
-        )
-    output:
-        "results/metrics/all-builtin.csv"
-    threads: workflow.cores / 2
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
-
-
-# FIXME: remove
-rule plot_ann_bench_distcomps:
-    input:
-        "results/metrics/all-builtin.csv"
-    output:
-        "results/plots/ann-benchmarks-distcomps.png"
-    run:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-        import seaborn as sns
-        import seaborn.objects as so
-        import pandas as pd
-
-        df = pd.read_csv(input[0])
-        print(df)
-
-        sns.kdeplot(
-            data=df,
-            x = "distcomp",
-            hue = "dataset",
-            cut = 0
-        )
-        plt.tight_layout()
-        plt.savefig(output[0])
-
-
-
-# Here we compute the metrics for each individual dataset, this
-# a subtask of `metrics_builtin_queries`
-# FIXME: remove
-rule eval_metrics_builtin_queries:
-    input:
-        get_data_path(DATA_DIR)
-    output:
-        "results/metrics/{dataset}-k{k}.csv",
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input[0],
-          input[0],
-          output[0],
-          int(wildcards['k']),
-          additional_header = ["dataset", "k"],
-          additional_row = [wildcards['dataset'], int(wildcards['k'])]
-        )
-
-
-
-
-# Brings together the information from metrics and index runtime evaluation
-#rule eval_runtime:
-#    input:
-#        metrics = f"results/metrics/{paramspace.wildcard_pattern}.csv",
-#        faiss_hnsw = f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
-#    output:
-#        f"results/metrics/runtime/{paramspace.wildcard_pattern}.csv",
-#    run:
-#        import pandas as pd
-#        metrics = pd.read_csv(input["metrics"]).rename({"i": "query_index"}, axis=1)
-#        faiss_runtime = pd.read_csv(input["faiss_hnsw"])
-#        df = pd.merge(metrics, faiss_runtime)
-#        df.to_csv(output[0], index=False)
-#
-#
-## Brings together all the metrics and the runtime evaluations of different indices
-## FIXME: rename it to something line "merge-all"
-#rule eval_runtime_all:
-#    input:
-#        expand(
-#          "results/metrics/runtime/{params}.csv",
-#          params=paramspace.instance_patterns
-#        )
-#    output:
-#        "results/metrics/all-synthetic-runtime.csv"
-#    run:
-#        import pandas as pd
-#        df = pd.concat((pd.read_csv(f) for f in input))
-#        df.to_csv(output[0], index=False)
-
 ######################################################################
 #
 # Indices
 #
 ######################################################################
-
 
 rule index_performance:
     input:
@@ -407,6 +281,7 @@ rule run_messi_shell:
             })
         df = pd.DataFrame(res)
         df.to_csv(output[0], index=False)
+
 
 rule run_faiss_hnsw:
     input:
@@ -514,25 +389,6 @@ rule metrics_all:
         import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input))
         df.to_csv(output[0], index=False)
-
-
-rule eval_all_metrics:
-    input:
-        data = os.path.join(DATA_DIR, "{dataset}.bin"),
-        queries = os.path.join(DATA_DIR, "{queries}.bin"),
-        # data = get_data_path(DATA_DIR),
-        # queries = get_data_path(DATA_DIR),
-    output:
-        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
-    threads: workflow.cores / 2
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input['data'],
-          input['queries'],
-          output[0],
-          int(wildcards['k']))
-
 
 
             
