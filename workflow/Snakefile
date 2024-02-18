@@ -46,7 +46,7 @@ import os
 DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") # on nefeli: export WORKGEN_DATA_DIR=/mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
-MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/isax")
+MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/")
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
@@ -81,7 +81,8 @@ rule all:
         os.path.join(
             RES_DIR,
             "metrics",
-            f"faiss_hnsw/{WORKLOADS.instance_patterns[0]}/results.csv"
+            #f"faiss_hnsw/{WORKLOADS.instance_patterns[0]}/results.csv"
+            f"messi/{WORKLOADS.instance_patterns[0]}/results.csv"
         )
 
 # Here we generate synthetic workloads sets
@@ -462,25 +463,36 @@ rule eval_all_metrics:
 rule run_messi_shell:
     input:
         data = os.path.join(DATA_DIR, "{dataset}.bin"),
-        queries = os.path.join(DATA_DIR, "{queries}.bin"),
-        # data = get_data_path(DATA_DIR),
-        # queries = get_data_path(DATA_DIR),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
     output:
-        temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"))
-    wildcard_constraints:
-        k="[0-9]+"
+        os.path.join(
+          RES_DIR, 
+          f"metrics/messi/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
     threads: workflow.cores / 2
     log:
-         temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log"))
+         os.path.join(RES_DIR,f"logs/messi/{WORKLOADS.wildcard_pattern}.log")
     run:
+        import read_data as rd
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
+        _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
+        _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
+        assert slength == q_slength
 
-        slength = config["features"][wildcards.dataset]
-        data_samples = config["samples"][wildcards.dataset]
-        q_samples = config["samples"][wildcards.queries]    
+        # how much cheaper is a SAX distance computation wrt a full distance
+        # computation. We use this to aggregate the two types of distances into
+        # a single one
+        sax_rescale = config["sax_length"] / slength
 
-        shell("/home/qwang/projects/isax-modularized/build/isax \
+        # FIXME: how dow we get the running time per query?
+
+        shell(MESSI_DIR + "/isax \
 --database_filepath='{input.data}' \
---query_filepath='{input.queries}' \
+--query_filepath='{input.workload}' \
 --database_size={data_samples} \
 --query_size={q_samples} \
 --sax_length={config[sax_length]} \
@@ -490,11 +502,23 @@ rule run_messi_shell:
 --series_length={slength} \
 --adhoc_breakpoints \
 --leaf_size={config[leaf_size]} \
---k={wildcards.k} \
+--k={k} \
 --with_id ")
 
-        shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> {output} ")
-        #shell("rm {log}")
+        res = []
+        for q_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11", read=True, iterable=True)):
+            dists, sax_dist = tuple(map(int, log_line.split()))
+            distcomp = dists + sax_rescale * sax_dist
+            res.append({
+                "query_index": q_idx,
+                "index_descr": "",
+                "time_s": None,
+                "distcomp": distcomp,
+                "recall": 1.0,
+            })
+        df = pd.DataFrame(res)
+        df.to_csv(output[0], index=False)
+            
 
 
 # add messi output to other metrics.csv
