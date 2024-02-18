@@ -57,18 +57,9 @@ min_version("8.4")
 import pandas as pd
 from parameters import workloads, get_data_path, setup_param_space
 
-# This `paramspace` variable is a wrapper around a dataframe
-# that holds all the parameter combinations we want to
-# test. These parameter combinations are set up in the
-# function in setup_param_space().
-# More on this here: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#parameter-space-exploration
-paramspace = setup_param_space()
+# All the workloads considered in our experiments. 
+# See the `parameters` module.
 WORKLOADS= workloads()
-
-# For convenience, here we extract the set of datasets we
-# use in this evaluation.
-DATASETS = set(paramspace.dataframe['dataset'])
-BIN_CONFIGS = pd.read_csv("workflow/bin_configs.csv")['Config'].values
 
 configfile: "workflow/config.yaml"
 
@@ -355,71 +346,8 @@ rule run_faiss_hnsw:
         df.to_csv(output[0], index=False)
 
 
-
-
-
-################################################################################
-#
-# TEST: Rules to compute all metrics and merge with messi
-# ===============
-#
-#
-################################################################################
-
-def get_all_pairs():
-    return [f"{dataset}_{query}"
-        for dataset, dataset_data in config["datasets"].items()
-        for query in dataset_data["queries"]]
-
-print(get_all_pairs())
-
-rule metrics_all:
-    input:
-        expand(
-          os.path.join(RES_DIR,"metrics/messi_{name}_k{k}.csv"),
-          name = get_all_pairs(),
-          k = [10]  
-        )
-    output:
-        os.path.join(RES_DIR,"metrics/metrics-messi-all.csv")
-    threads: workflow.cores / 2
-    wildcard_constraints:
-        k="[0-9]+"
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
-
-
-            
-
-
-# add messi output to other metrics.csv
-rule merge_messi:
-    input:
-        messi = os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"),
-        metrics = os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
-    output:
-        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv")
-    wildcard_constraints:
-        k="[0-9]+"
-    run:          
-        slength = config["features"][wildcards.dataset]
-        data_samples = config["samples"][wildcards.dataset]
-
-        l = []      
-        with open(input['messi']) as f:
-            for line in f.readlines():
-                x, y = line.split(" ")
-                c = (slength*int(x) + config['sax_length']*int(y))/(slength*data_samples)
-                l.append(c)
-
-        df = pd.read_csv(input['metrics'])    
-        df['messi'] = l
-        df.to_csv(output[0], index=False)
-
-
-# todo: rule to add noise to queries if not exists 
+# TODO: rule to add noise to queries if not exists. It can be its own function
+# in module `generator`
 
 
 rule prepare_data_file:
@@ -444,7 +372,6 @@ rule convert_annbench_to_bin:
                 "nytimes-angular-256-289761",
             ]
         )
-    
     run:
         import read_data
         features_map = {32: 25, 104: 100}
@@ -458,61 +385,3 @@ rule convert_annbench_to_bin:
             read_data.hdf5_to_bin(tmp, o, "train")
 
 
-rule run_messi_one:
-	output:
-		"messi_results_config{index}.txt"
-	run:
-		import os
-		df = pd.read_csv("bin_configs.csv")
-		row = wildcards.get('index')
-		dsfile = df.query('Config=='+row)['DataFile'].values[0]
-		queryfile = df.query('Config=='+row)['QueryFile'].values[0]
-		slength=str(df.query('Config=='+row)['SeriesLength'].values[0])
-		#print(slength)
-		saxlength=16
-
-		shelline = "rm messi"+row+".log"
-		os.system(shelline)
-		
-		shelline = "rm messi_results_interm_config"+row+".txt"
-		os.system(shelline)
-	
-		shelline = "rm messi_results_config"+row+".txt"
-		os.system(shelline)
-
-		shelline = '../isax-modularized/build/isax --database_filepath='+dsfile+' --query_filepath='+queryfile+' --database_size=1000000 --query_size=1000 --sax_length='+str(saxlength)+' --sax_cardinality=8 --cpu_cores=4 --log_filepath=messi'+str(row)+'.log --series_length='+slength+' --adhoc_breakpoints --leaf_size=10000 --k=1 --with_id'
-		#print(shelline)
-		os.system(shelline)
-	
-
-		shelline = "grep -F 'l2square' messi"+row+".log | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> messi_results_interm_config"+row+".txt"
-		os.system(shelline)
-
-		dict = {}
-		l = []
-		with open("messi_results_interm_config"+row+".txt") as f:
-			for line in f.readlines():
-				x, y = line.split(" ")
-				l.append(int(slength)*int(x) + int(saxlength)*int(y))
-		dict[row] = l
-        
-		df = pd.DataFrame.from_dict(dict,)
-		df.to_csv('messi_results_config'+row+'.txt',index=False)
-
-	
-rule run_messi_all:
-	input:
-		expand("messi_results_config{index}.txt", index = BIN_CONFIGS)		
-	output:
-		"messi_all.csv"
-	run:
-		for f in input:
-			print(pd.read_csv(f))
-		df = pd.concat((pd.read_csv(f) for f in input), axis=1)
-		#print(df)
-		df.to_csv(output[0], index=False)
-		
-		
-		
-		
-	
