@@ -119,6 +119,14 @@ rule generate_synthetic:
                 num_queries=workload_config["num_queries"],
                 scale=workload_config["scale"],
             )
+        elif workload_type == "file-based":
+            print("linking file-based workload")
+            os.symlink(
+              os.path.abspath(
+                os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
+              ),
+              output[0]
+            )
         else:
             raise ValueError(f"unknown workload type {workload_type}")
 
@@ -382,13 +390,22 @@ rule convert_annbench_to_bin:
     run:
         import read_data
         features_map = {32: 25, 104: 100}
-        for o in output:
-            name, samples, features, distance_metric = read_data.parse_filename(o)
-            name = name.replace("_", "-")
+        for data_output in output:
+            print("data output", data_output)
+            name, samples, features, distance_metric = read_data.parse_filename(data_output)
+            aname = name.replace("_", "-")
             ann_feats = features_map.get(features, features)
-            ann_bench_name = f"{name}-{ann_feats}-{distance_metric}"
+            ann_bench_name = f"{aname}-{ann_feats}-{distance_metric}"
             tmp = os.path.join(DATA_DIR, f"{ann_bench_name}.hdf5")
             read_data.download(f"https://ann-benchmarks.com/{ann_bench_name}.hdf5", tmp)
-            read_data.hdf5_to_bin(tmp, o, "train")
+            read_data.hdf5_to_bin(tmp, data_output, "train")
+
+            qsamples = read_data.read_multiformat(tmp, "test")[0].shape[0]
+            queries_output = os.path.join(
+                os.path.dirname(data_output),
+                f"queries_{name}-{distance_metric}-{features}-{qsamples}.bin"
+            )
+            print("queries output", queries_output)
+            read_data.hdf5_to_bin(tmp, queries_output, "test")
 
 

@@ -44,6 +44,9 @@ class WorkloadPatterns:
         elif workload_type == "synthetic-gaussian-noise":
             scale = config["scale"]
             return f"GaussianNoise({scale})"
+        elif workload_type == "file-based":
+            fname = config["queries_filename"]
+            return f"File({fname})"
         else:
             raise KeyError(f"unknown workload type {workload_type}")
 
@@ -61,6 +64,43 @@ class WorkloadPatterns:
     @property
     def workloads_dict(self):
         return self._workloads_dict
+
+
+def _file_based_workloads():
+    """List of configurations using already existing files containing queries."""
+
+    configs = []
+    workloads_dict = dict()
+
+    workload_type = "file-based"
+    dataset_query_pairs = [
+        (
+            "fashion_mnist-euclidean-784-60K",
+            "queries_fashion_mnist-euclidean-784-10000",
+        ),
+        # ("glove-angular-32-1183514", "queries_glove-angular-32-10000"),
+        # ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
+        # ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
+    ]
+    k_values = [10]
+    for (dataset, queryset), k in product(dataset_query_pairs, k_values):
+        conf = {
+            "workload_type": workload_type,
+            "dataset": dataset,
+            "k": k,
+            "queries_filename": queryset,
+        }
+        key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
+        workloads_dict[key] = conf
+        configs.append(
+            {
+                "dataset": dataset,
+                "workload_key": key,
+                "workload_file": queryset,
+            }
+        )
+
+    return configs, workloads_dict
 
 
 def workloads():
@@ -179,6 +219,10 @@ def workloads():
                 }
             )
 
+    file_configs = _file_based_workloads()
+    configs.extend(file_configs[0])
+    workloads_dict.update(file_configs[1])
+
     return WorkloadPatterns(configs, workloads_dict)
 
 
@@ -278,7 +322,11 @@ if __name__ == "__main__":
     for pat in WORKLOADS.instance_patterns:
         fname = os.path.join(GENERATED_DIR, pat + ".bin")
         wkey = re.findall("workload_key~([a-z0-9]+)", pat)[0]
-        if os.path.isfile(fname) and wkey.startswith(query):
+        if not wkey.startswith(query):
+            continue
+        if os.path.isfile(fname):
             print(fname)
-            conf = WORKLOADS.config_for(wkey)
-            pprint.pprint(conf)
+        else:
+            print("MISSING: ", fname)
+        conf = WORKLOADS.config_for(wkey)
+        pprint.pprint(conf)
