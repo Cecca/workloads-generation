@@ -87,7 +87,7 @@ def workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        "glove-angular-32-1183514",
+        # "glove-angular-32-1183514",
         # "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
     ]
@@ -157,6 +157,7 @@ def workloads():
     # Gaussian noise workloads
     workload_type = "synthetic-gaussian-noise"
     scales = [0.1, 1.0, 10.0]
+    num_queries = [300]
     for dataset, k, nq in product(datasets, k_values, num_queries):
         for scale in scales:
             conf = {

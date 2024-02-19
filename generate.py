@@ -22,7 +22,8 @@ def generate_queries_gaussian_noise(
     seed=1234,
 ):
     assert distance_metric in ["angular", "euclidean"]
-    gen = np.random.default_rng(seed)
+    # multiply by the scale so that different scales with the same seed are not scaled versions of the same noise
+    gen = np.random.default_rng(int(seed * scale))
     starting_ids = gen.choice(
         np.arange(dataset.shape[0]), size=num_queries, replace=False
     )
