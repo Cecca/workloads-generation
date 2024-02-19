@@ -98,7 +98,6 @@ rule generate_synthetic:
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         workload_type = workload_config["workload_type"]
         if workload_type == "synthetic-simulated-annealing":
-            print(workload_config)
             generate.generate_workload_annealing(
               input[0],
               output[0],
@@ -111,6 +110,14 @@ rule generate_synthetic:
               initial_temperature = int(workload_config['initial_temperature']),
               max_steps = 10000,
               threads = threads,
+            )
+        elif workload_type == "synthetic-gaussian-noise":
+            print("generating with gaussian noise", workload_config)
+            generate.generate_workload_gaussian_noise(
+                input[0],
+                output[0],
+                num_queries=workload_config["num_queries"],
+                scale=workload_config["scale"],
             )
         else:
             raise ValueError(f"unknown workload type {workload_type}")

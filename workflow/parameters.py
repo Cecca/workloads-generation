@@ -41,6 +41,9 @@ class WorkloadPatterns:
             low = config["target_low"]
             high = config["target_high"]
             return f"Annealing({metric}, {low:.2f}, {high:.2f})"
+        elif workload_type == "synthetic-gaussian-noise":
+            scale = config["scale"]
+            return f"GaussianNoise({scale})"
         else:
             raise KeyError(f"unknown workload type {workload_type}")
 
@@ -71,6 +74,8 @@ def workloads():
     import sys
     import os
 
+    # Make the read_data module visible by adding its directory to
+    # the search path.
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
     import read_data as rd
@@ -149,7 +154,30 @@ def workloads():
                     }
                 )
 
-    # return Paramspace(pd.DataFrame(configs)), workloads_dict
+    # Gaussian noise workloads
+    workload_type = "synthetic-gaussian-noise"
+    scales = [0.1, 1.0, 10.0]
+    for dataset, k, nq in product(datasets, k_values, num_queries):
+        for scale in scales:
+            conf = {
+                "workload_type": workload_type,
+                "dataset": dataset,
+                "k": k,
+                "num_queries": nq,
+                "scale": scale,
+            }
+            key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
+            workloads_dict[key] = conf
+            dname, _, features, distance_metric = rd.parse_filename(dataset)
+            workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
+            configs.append(
+                {
+                    "dataset": dataset,
+                    "workload_key": key,
+                    "workload_file": workload_fname,
+                }
+            )
+
     return WorkloadPatterns(configs, workloads_dict)
 
 
