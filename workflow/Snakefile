@@ -427,6 +427,7 @@ rule run_messi_shell:
          temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log"))
     run:
 
+        #if not os.path.exists(output):
         slength = config["features"][wildcards.dataset]
         data_samples = config["samples"][wildcards.dataset]
         q_samples = config["samples"][wildcards.queries]    

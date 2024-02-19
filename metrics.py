@@ -75,26 +75,27 @@ def get_epsilons(queries, dataset, distance_metric, threads=None):
     sample = len(queries)
     max_e_arr = []
 
-    # #for qq in queries:
-    # for i in tqdm(range(sample)):
-    #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-    #     max_e = dist[-1]/dist[0]-1
-    #     max_e_arr.append(max_e)
-    def compute_query(i):
+    #for qq in queries:
+    for i in tqdm(range(sample)):
         dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-        max_e = dist[-1] / dist[0] - 1
-        return max_e
+        max_e = dist[-1]/dist[0]-1
+        max_e_arr.append(max_e)
+    
+    # def compute_query(i):
+    #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
+    #     max_e = dist[-1] / dist[0] - 1
+    #     return max_e
 
-    if threads is None:
-        import os
+    # if threads is None:
+    #     import os
 
-        threads = os.cpu_count()
-    with ThreadPoolExecutor(threads) as pool:
-        tasks = [pool.submit(compute_query, i) for i in range(sample)]
-        max_e_arr = []
-        for task in tqdm(as_completed(tasks), total=len(tasks)):
-            max_e = task.result()
-            max_e_arr.append(max_e)
+    #     threads = os.cpu_count()
+    # with ThreadPoolExecutor(threads) as pool:
+    #     tasks = [pool.submit(compute_query, i) for i in range(sample)]
+    #     max_e_arr = []
+    #     for task in tqdm(as_completed(tasks), total=len(tasks)):
+    #         max_e = task.result()
+    #         max_e_arr.append(max_e)
 
     mean_max_e = sum(max_e_arr) / len(max_e_arr)
     print(f"mean_max_epsilon: {mean_max_e}")
