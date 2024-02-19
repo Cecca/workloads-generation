@@ -1,12 +1,13 @@
 sax_length: 16
 sax_card: 8
-leaf_size: 10000
-cpu_cores: 4
+leaf_size: 20000
+cpu_cores: 16
 
 datasets:
     sald-128-1m: 
         queries: 
-                - sald-128-1k 
+                - sald-128-1k:
+                        epsilons: []
                 # - sald-noise-10
                 # - sald-noise-30
                 # - sald-noise-50
@@ -58,4 +59,7 @@ features:
         rw-256-1k: 256
         seismic-256-100m: 256
         seismic-256-1k: 256
+
+workloads:
+        
 
