@@ -477,59 +477,6 @@ rule merge_messi:
 
 # todo: rule to add noise to queries if not exists 
 
-################################################################################
-#
-# UMAP Embeddings
-# ===============
-#
-# This is still a draft, computing the UMAP embeddings for the
-# datasets, to visualize them in two dimensions.
-#
-################################################################################
-
-rule umap_embedding_plots:
-    input:
-        expand(".data/umap/{name}.png", name=DATASETS)
-
-rule umap_embedding_plot:
-    input:
-        ".data/umap/{name}.hdf5"
-    output:
-        ".data/umap/{name}.png",
-    run:
-        import h5py
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-
-        with h5py.File(input[0]) as hfp:
-            embedding = hfp["train"][:]
-        plt.scatter(embedding[:,0], embedding[:,1], s=0.1)
-        plt.tight_layout()
-        plt.savefig(output[0])
-
-
-rule umap_embedding:
-    input:
-        ".data/{name}.hdf5"
-    output:
-        embedding = ".data/umap/{name}.hdf5",
-        embedder = ".data/umap/embedder/{name}.pkl.gz"
-    threads: workflow.cores
-    run:
-        import umap
-        import read_data
-        import h5py
-        import pickle
-        import gzip
-        embedder = umap.UMAP()
-        dataset, _ = read_data.read_multiformat(input[0], "train")
-        embedding = embedder.fit_transform(dataset)
-        with h5py.File(output["embedding"], "w") as hfp:
-            hfp["train"] = embedding
-        with gzip.open(output["embedder"], "wb") as fp:
-            pickle.dump(embedder, fp)
-
 
 rule prepare_data_file:
     output:
