@@ -55,7 +55,7 @@ min_version("8.4")
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
 import pandas as pd
-from parameters import workloads, get_data_path, setup_param_space
+from parameters import workloads
 
 # All the workloads considered in our experiments. 
 # See the `parameters` module.
