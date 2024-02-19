@@ -259,4 +259,25 @@ def setup_param_space():
 
 
 if __name__ == "__main__":
-    print(setup_param_space())
+    import sys
+    import os
+    import re
+    import pprint
+
+    DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")
+    GENERATED_DIR = os.path.join(DATA_DIR, "generated")
+
+    WORKLOADS = workloads()
+
+    if len(sys.argv) > 1:
+        query = sys.argv[1]
+    else:
+        query = ""
+
+    for pat in WORKLOADS.instance_patterns:
+        fname = os.path.join(GENERATED_DIR, pat + ".bin")
+        wkey = re.findall("workload_key~([a-z0-9]+)", pat)[0]
+        if os.path.isfile(fname) and wkey.startswith(query):
+            print(fname)
+            conf = WORKLOADS.config_for(wkey)
+            pprint.pprint(conf)
