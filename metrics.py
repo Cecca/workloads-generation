@@ -100,7 +100,8 @@ def get_epsilons(queries, dataset, distance_metric, threads=None):
     mean_max_e = sum(max_e_arr) / len(max_e_arr)
     print(f"mean_max_epsilon: {mean_max_e}")
 
-    return [mean_max_e * r for r in [0.25, 0.5, 0.75]]
+    quantiles = [0.25, 0.5, 0.75]
+    return [mean_max_e * r for r in quantiles], quantiles
 
 
 def build_index(dataset, n_list, distance_metric):
@@ -245,7 +246,7 @@ def metrics_csv(
         exact_index=exact_index,
     )
 
-    epsilons = get_epsilons(
+    epsilons, eps_quantiles = get_epsilons(
         queries[: int(sample * len(queries)) + 1], exact_index, distance_metric
     )
     # epsilons = [.5, 1, 1.5] # temp to test
@@ -289,7 +290,7 @@ def metrics_csv(
 
         header.extend(["distcomp"])
         header.extend(additional_header)
-        header.extend(["eps_" + f"{e:.2f}" for e in epsilons])
+        header.extend([f"eps_q{e}" for e in eps_quantiles])
         writer.writerow(header)
 
         for row in rows:
@@ -365,7 +366,7 @@ if __name__ == "__main__":
     if epsilon is not None:
         epsilons = [float(x) for x in opt_params]
     else:
-        epsilons = get_epsilons(
+        epsilons, eps_quantiles = get_epsilons(
             queries[: int(sample * len(queries)) + 1], dataset, distance_metric
         )
 
