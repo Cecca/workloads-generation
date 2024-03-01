@@ -181,7 +181,7 @@ rule eval_metrics_concat:
 rule plot_difficulty:
     input:
         #metrics = "results/metrics/all-metrics.csv"
-        os.path.join(RES_DIR, "metrics","all-metrics.csv")
+        metrics = os.path.join(RES_DIR, "metrics","all-metrics.csv")
     output:
         #"results/plots/all-metrics.png"
         os.path.join(RES_DIR, "plots","all-metrics.png")
