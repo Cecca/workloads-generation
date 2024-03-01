@@ -168,7 +168,8 @@ rule eval_metrics_concat:
           params=WORKLOADS.instance_patterns
         )
     output:
-        "results/metrics/all-metrics.csv"
+        #"results/metrics/all-metrics.csv"
+        os.path.join(RES_DIR, "metrics","all-metrics.csv")
     run:
         import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
@@ -179,9 +180,11 @@ rule eval_metrics_concat:
 # according to their "difficulty group"
 rule plot_difficulty:
     input:
-        metrics = "results/metrics/all-metrics.csv"
+        #metrics = "results/metrics/all-metrics.csv"
+        os.path.join(RES_DIR, "metrics","all-metrics.csv")
     output:
-        "results/plots/all-metrics.png"
+        #"results/plots/all-metrics.png"
+        os.path.join(RES_DIR, "plots","all-metrics.png")
     run:
         import matplotlib
         matplotlib.use("Agg")
