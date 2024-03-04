@@ -71,32 +71,19 @@ def read_sys_argv_list(start_index=4):
 
 
 def get_epsilons(queries, dataset, distance_metric, threads=None):
+    if threads is not None:
+        print("WARNING: the threads parameter in get_epsilons is no longer used")
     print("Compute epsilons for a given dataset and workload")
-    sample = len(queries)
     max_e_arr = []
 
-    # #for qq in queries:
-    # for i in tqdm(range(sample)):
-    #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-    #     max_e = dist[-1]/dist[0]-1
-    #     max_e_arr.append(max_e)
-    def compute_query(i):
-        dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-        max_e = dist[-1] / dist[0] - 1
-        return max_e
-
-    if threads is None:
-        import os
-
-        threads = os.cpu_count()
-    with ThreadPoolExecutor(threads) as pool:
-        tasks = [pool.submit(compute_query, i) for i in range(sample)]
-        max_e_arr = []
-        for task in tqdm(as_completed(tasks), total=len(tasks)):
-            max_e = task.result()
-            max_e_arr.append(max_e)
-
-    mean_max_e = sum(max_e_arr) / len(max_e_arr)
+    # We build an auxiliary "flat" index (i.e. it is simply the brute force
+    # algorithm implemented by faiss) to delegate parallelization to the
+    # C++ side.
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+    dists = compute_distances(queries, None, distance_metric, index)
+    max_e_arr = dists[:, -1] / dists[:, 0] - 1
+    mean_max_e = max_e_arr.mean()
     print(f"mean_max_epsilon: {mean_max_e}")
 
     quantiles = [0.25, 0.5, 0.75]
