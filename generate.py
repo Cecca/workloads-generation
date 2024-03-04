@@ -14,6 +14,54 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 
 
+def generate_queries_gaussian_noise(
+    dataset,
+    distance_metric,
+    num_queries,
+    scale,
+    seed=1234,
+):
+    assert distance_metric in ["angular", "euclidean"]
+    # multiply by the scale so that different scales with the same seed are not scaled versions of the same noise
+    gen = np.random.default_rng(int(seed * scale))
+    starting_ids = gen.choice(
+        np.arange(dataset.shape[0]), size=num_queries, replace=False
+    )
+    pts = dataset[starting_ids, :]
+    noise = gen.normal(0, scale, size=(num_queries, pts.shape[1]))
+    pts += noise
+    if distance_metric == "angular":
+        pts /= np.linalg.norm(pts, axis=1)[:, np.newaxis]
+
+    return pts
+
+
+def generate_workload_gaussian_noise(
+    dataset_input,
+    queries_output,
+    num_queries,
+    scale,
+    seed=1234,
+):
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    print("loaded dataset with shape", dataset.shape)
+
+    queries = generate_queries_gaussian_noise(
+        dataset,
+        distance_metric,
+        num_queries,
+        scale,
+        seed,
+    )
+
+    if queries_output.endswith(".bin"):
+        queries.tofile(queries_output)
+    elif queries_output.endswith(".hdf5"):
+        write_queries_hdf5(queries, queries_output)
+    else:
+        raise ValueError(f"Unknown format `{queries_output}`")
+
+
 def generate_queries_annealing(
     dataset,
     distance_metric,
@@ -608,7 +656,12 @@ def generate_workload_annealing(
         threads,
     )
 
-    write_queries_hdf5(queries, queries_output)
+    if queries_output.endswith(".bin"):
+        queries.tofile(queries_output)
+    elif queries_output.endswith(".hdf5"):
+        write_queries_hdf5(queries, queries_output)
+    else:
+        raise ValueError(f"Unknown format `{queries_output}`")
 
 
 def main():
