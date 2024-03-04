@@ -46,37 +46,145 @@ import os
 DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") # on nefeli: export WORKGEN_DATA_DIR=/mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
-MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/isax")
+MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/")
 
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
-min_version("7.24")
+min_version("8.4")
 
 # We can import other packages. One cool thing of Snakemake
 # is that the entire Snakefile can be scripted with Python
 import pandas as pd
-from parameters import setup_param_space, get_data_path
+from parameters import workloads
 
-# This `paramspace` variable is a wrapper around a dataframe
-# that holds all the parameter combinations we want to
-# test. These parameter combinations are set up in the
-# function in setup_param_space().
-# More on this here: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#parameter-space-exploration
-paramspace = setup_param_space()
+# All the workloads considered in our experiments. 
+# See the `parameters` module.
+WORKLOADS= workloads()
 
-# For convenience, here we extract the set of datasets we
-# use in this evaluation.
-DATASETS = set(paramspace.dataframe['dataset'])
-BIN_CONFIGS = pd.read_csv("workflow/bin_configs.csv")['Config'].values
+configfile: "workflow/config.yaml"
+
+rule all:
+    input:
+        os.path.join(
+            RES_DIR,
+            "plots",
+            "all-metrics.png"
+        ),
+        os.path.join(RES_DIR, "metrics", "index-performance.csv")
+
+######################################################################
+#
+# Workload generation
+#
+######################################################################
+
+# Here we generate synthetic workloads sets
+rule generate_synthetic:
+    input:
+        os.path.join(DATA_DIR, "{dataset}.bin")
+    output:
+        os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}.bin"
+        ),
+    threads: workflow.cores
+    run:
+        import workflow.parameters as wparams
+        import generate
+        import logging
+        import sys
+        import os
+        logging.basicConfig(level=logging.INFO)
+
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        workload_type = workload_config["workload_type"]
+        if workload_type == "synthetic-simulated-annealing":
+            generate.generate_workload_annealing(
+              input[0],
+              output[0],
+              k = int(workload_config['k']),
+              metric = workload_config["difficulty"],
+              target_low = float(workload_config['target_low']),
+              target_high = float(workload_config['target_high']),
+              num_queries = int(workload_config['num_queries']),
+              scale = float(workload_config['scale']),
+              initial_temperature = int(workload_config['initial_temperature']),
+              max_steps = 10000,
+              threads = threads,
+            )
+        elif workload_type == "synthetic-gaussian-noise":
+            print("generating with gaussian noise", workload_config)
+            generate.generate_workload_gaussian_noise(
+                input[0],
+                output[0],
+                num_queries=workload_config["num_queries"],
+                scale=workload_config["scale"],
+            )
+        elif workload_type == "file-based":
+            print("linking file-based workload")
+            os.symlink(
+              os.path.abspath(
+                os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
+              ),
+              output[0]
+            )
+        else:
+            raise ValueError(f"unknown workload type {workload_type}")
+
+
+# And finally here we compute the metrics of the synthetic
+# query sets
+rule eval_metrics:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        queries =
+          os.path.join(GENERATED_DIR, 
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
+    output:
+        os.path.join(RES_DIR, f"metrics/{WORKLOADS.wildcard_pattern}.csv"),
+    run:
+        import workflow.parameters as wparams
+        import metrics
+
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        workload_descr = WORKLOADS.description_for(wildcards["workload_key"])
+
+        metrics.metrics_csv(
+          input['data'],
+          input['queries'],
+          output[0],
+          workload_config['k'],
+          additional_header = ["dataset", "workload_description"],
+          additional_row = [workload_config['dataset'], workload_descr]
+        )
+
+
+# Here we bring in a single csv file the metrics computed
+# on the syntehtic query sets
+rule eval_metrics_concat:
+    input:
+        metrics = expand(
+          os.path.join(RES_DIR, "metrics", "{params}.csv"),
+          params=WORKLOADS.instance_patterns
+        )
+    output:
+        #"results/metrics/all-metrics.csv"
+        os.path.join(RES_DIR, "metrics","all-metrics.csv")
+    run:
+        import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
+        df.to_csv(output[0], index=False)
 
 # This rule plots the number of distance computations against
 # the RC metric for different datasets, coloring points
 # according to their "difficulty group"
-rule plot_synthetic_difficulty:
+rule plot_difficulty:
     input:
-        metrics = "results/metrics/all-synthetic.csv"
+        #metrics = "results/metrics/all-metrics.csv"
+        metrics = os.path.join(RES_DIR, "metrics","all-metrics.csv")
     output:
-        "results/plots/synthetic-difficulty.png"
+        #"results/plots/all-metrics.png"
+        os.path.join(RES_DIR, "plots","all-metrics.png")
     run:
         import matplotlib
         matplotlib.use("Agg")
@@ -86,166 +194,116 @@ rule plot_synthetic_difficulty:
         import pandas as pd
 
         df = pd.read_csv(input["metrics"])
-        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
-        averages = df.groupby(["dataset", "target", "target_metric"]).mean().reset_index()
-        print(averages[["dataset", "target", "distcomp", "rc_10", "lid_10"]])
-
-        (
-          so.Plot(df, y="lid_10", x="distcomp", color="target")
-            .facet("dataset")
-            .add(so.Dot())
-            #.add(so.Dot(color="black"), data=averages)
-            .save(output[0])
-        )
-
-rule plot_synthetic_runtime:
-    input:
-        "results/metrics/all-synthetic-runtime.csv"
-    output:
-        "results/plots/synthetic-difficulty-runtime.png"
-    run:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-        import seaborn as sns
-        import seaborn.objects as so
-        import pandas as pd
-
-        df = pd.read_csv(input[0])
-        df["target"] = df[[ "target_low", "target_high" ]].apply(lambda row: f"{row[0]}--{row[1]}", axis=1)
-        print(df.columns)
-        averages = df.groupby(["dataset", "target", "target_metric"])[["time_s"]].mean().reset_index()
-
-        (
-          so.Plot(df, y="time_s", x="target")
-            .facet("dataset")
-            .add(so.Dot())
-            .add(so.Dot(color="black"), data=averages)
-            .save(output[0])
-        )
-
-
-# This task computes the CSV file for the metrics
-# of the queries builtin each dataset.
-rule metrics_builtin_queries:
-    input:
-        expand(
-          "results/metrics/{name}-k{k}.csv",
-          name      = DATASETS,
-          k         = [10]
-        )
-    output:
-        "results/metrics/all-builtin.csv"
-    threads: workflow.cores / 2
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
-
-
-rule plot_ann_bench_distcomps:
-    input:
-        "results/metrics/all-builtin.csv"
-    output:
-        "results/plots/ann-benchmarks-distcomps.png"
-    run:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-        import seaborn as sns
-        import seaborn.objects as so
-        import pandas as pd
-
-        df = pd.read_csv(input[0])
         print(df)
+        averages = df.groupby(["dataset", "workload_description"]).mean().reset_index()
 
-        sns.kdeplot(
-            data=df,
-            x = "distcomp",
-            hue = "dataset",
-            cut = 0
-        )
-        plt.tight_layout()
-        plt.savefig(output[0])
-
-
-
-# Here we compute the metrics for each individual dataset, this
-# a subtask of `metrics_builtin_queries`
-rule eval_metrics_builtin_queries:
-    input:
-        get_data_path(DATA_DIR)
-    output:
-        "results/metrics/{dataset}-k{k}.csv",
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input[0],
-          input[0],
-          output[0],
-          int(wildcards['k']),
-          additional_header = ["dataset", "k"],
-          additional_row = [wildcards['dataset'], int(wildcards['k'])]
+        (
+          so.Plot(df,
+                  y="distcomp",
+                  x="workload_description",
+                  color="workload_description")
+            .facet("dataset")
+            .add(so.Dot())
+            .save(output[0])
         )
 
+######################################################################
+#
+# Indices
+#
+######################################################################
 
-# Here we bring in a single csv file the metrics computed
-# on the syntehtic query sets
-rule synthetic_metrics:
-    input:
-        metrics = expand(
-          "results/metrics/{params}.csv",
-          params=paramspace.instance_patterns
-        )
-    output:
-        "results/metrics/all-synthetic.csv"
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
-        df.to_csv(output[0], index=False)
-
-
-# Brings together the information from metrics and index runtime evaluation
-rule eval_runtime:
-    input:
-        metrics = f"results/metrics/{paramspace.wildcard_pattern}.csv",
-        faiss_hnsw = f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
-    output:
-        f"results/metrics/runtime/{paramspace.wildcard_pattern}.csv",
-    run:
-        import pandas as pd
-        metrics = pd.read_csv(input["metrics"]).rename({"i": "query_index"}, axis=1)
-        faiss_runtime = pd.read_csv(input["faiss_hnsw"])
-        df = pd.merge(metrics, faiss_runtime)
-        df.to_csv(output[0], index=False)
-
-
-# Brings together all the metrics and the runtime evaluations of different indices
-# FIXME: keep only one between this and synthetic_metrics
-rule eval_runtime_all:
+rule index_performance:
     input:
         expand(
-          "results/metrics/runtime/{params}.csv",
-          params=paramspace.instance_patterns
+            os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv")    ,
+            index = ["messi", "faiss_hnsw"],
+            pattern = WORKLOADS.instance_patterns
         )
     output:
-        "results/metrics/all-synthetic-runtime.csv"
+        os.path.join(RES_DIR, "metrics", "index-performance.csv")
     run:
         import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
+        dfs = []
+        for csv in input:
+            dfs.append( pd.read_csv(csv) )
+        pd.concat(dfs).to_csv(output[0])
 
-
-# Run faiss_hnsw on the synthetic datasets
-rule faiss_hnsw_synthetic:
+rule run_messi_shell:
     input:
-        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
-        queries =
-          os.path.join(GENERATED_DIR, 
-            f"{paramspace.wildcard_pattern}.hdf5"
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
           ),
     output:
-        f"results/metrics/faiss_hnsw/{paramspace.wildcard_pattern}.csv",
+        os.path.join(
+          RES_DIR, 
+          f"metrics/messi/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
+    threads: workflow.cores / 2
+    log:
+         os.path.join(RES_DIR,f"logs/messi/{WORKLOADS.wildcard_pattern}.log")
+    run:
+        import read_data as rd
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
+        _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
+        _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
+        assert slength == q_slength
+
+        # how much cheaper is a SAX distance computation wrt a full distance
+        # computation. We use this to aggregate the two types of distances into
+        # a single one
+        sax_rescale = config["sax_length"] / slength
+
+        # FIXME: how dow we get the running time per query?
+
+        shell(MESSI_DIR + "/isax \
+--database_filepath='{input.data}' \
+--query_filepath='{input.workload}' \
+--database_size={data_samples} \
+--query_size={q_samples} \
+--sax_length={config[sax_length]} \
+--sax_cardinality={config[sax_card]} \
+--cpu_cores={config[cpu_cores]} \
+--log_filepath='{log}' \
+--series_length={slength} \
+--adhoc_breakpoints \
+--leaf_size={config[leaf_size]} \
+--k={k} \
+--with_id ")
+
+        res = []
+        for q_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11", read=True, iterable=True)):
+            dists, sax_dist = tuple(map(int, log_line.split()))
+            distcomp = dists + sax_rescale * sax_dist
+            res.append({
+                "dataset": wildcards["dataset"],
+                "workload": WORKLOADS.description_for(wildcards["workload_key"]),
+                "query_index": q_idx,
+                "index_name": "messi",
+                "index_params": "",
+                "time_s": None,
+                "distcomp": distcomp,
+                "recall": 1.0,
+            })
+        df = pd.DataFrame(res)
+        df.to_csv(output[0], index=False)
+
+
+rule run_faiss_hnsw:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
+    output:
+        os.path.join(
+          RES_DIR, 
+          f"metrics/faiss_hnsw/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
     run:
         import read_data
         import faiss
@@ -254,9 +312,10 @@ rule faiss_hnsw_synthetic:
         import pandas as pd
         import json
 
-        k = int(wildcards["k"])
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
-        queryset, _ = read_data.read_multiformat(input["queries"], "test")
+        queryset, _ = read_data.read_multiformat(input["workload"], "test")
         print("Populating index")
         index_params = "HNSW32"
         index = faiss.index_factory(dataset.shape[1], index_params)
@@ -289,9 +348,12 @@ rule faiss_hnsw_synthetic:
             tend = time.time()
             elapsed_secs = ( tend - tstart ) / nruns
             res.append({
+                "dataset": wildcards["dataset"],
+                "workload": WORKLOADS.description_for(wildcards["workload_key"]),
                 "query_index": q_idx,
+                "index_name": "faiss_hnsw",
                 "target_recall": target_recall,
-                "index_descr": json.dumps({
+                "index_params": json.dumps({
                     "index_params": index_params,
                     "efSearch": index.hnsw.efSearch
                 }, sort_keys=True),
@@ -302,181 +364,8 @@ rule faiss_hnsw_synthetic:
         df.to_csv(output[0], index=False)
 
 
-# Here we generate syntehtic query sets, guided by the
-# relative contrast metric
-rule generate_synthetic:
-    input:
-        #os.path.join(DATA_DIR, "{dataset}.hdf5")
-        get_data_path(DATA_DIR)
-    output:
-        os.path.join(GENERATED_DIR, 
-          f"{paramspace.wildcard_pattern}.hdf5"
-        ),
-    threads: workflow.cores
-    params:
-        paramspace.instance
-    run:
-        import generate
-        import logging
-        logging.basicConfig(level=logging.INFO)
-        generate.generate_workload_annealing(
-          input[0],
-          output[0],
-          k = int(wildcards['k']),
-          metric = wildcards["difficulty"],
-          target_low = float(wildcards['target_lower']),
-          target_high = float(wildcards['target_upper']),
-          num_queries = int(wildcards['num_queries']),
-          scale = float(wildcards['scale']),
-          initial_temperature = int(wildcards['initial_temperature']),
-          max_steps = 10000,
-          threads = threads
-        )
-
-
-# And finally here we compute the metrics of the synthetic
-# query sets
-rule eval_metrics:
-    input:
-        data = get_data_path(DATA_DIR), #os.path.join(DATA_DIR, "{dataset}.hdf5"),
-        queries =
-          os.path.join(GENERATED_DIR, 
-            f"{paramspace.wildcard_pattern}.hdf5"
-          ),
-    output:
-        f"results/metrics/{paramspace.wildcard_pattern}.csv",
-    params:
-        conf = paramspace.instance
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input['data'],
-          input['queries'],
-          output[0],
-          int(wildcards['k']),
-          additional_header = ["dataset", "target_low", "target_high", "target_metric"],
-          additional_row = [wildcards['dataset'], float(wildcards['target_lower']), float(wildcards['target_upper']), wildcards["difficulty"]]
-        )
-
-################################################################################
-#
-# TEST: Rules to compute all metrics and merge with messi
-# ===============
-#
-#
-################################################################################
-
-configfile: "workflow/config.yaml"
-#print("Config is: ", config)
-
-def get_all_pairs():
-    return [f"{dataset}_{query}"
-        for dataset, dataset_data in config["datasets"].items()
-        for query in dataset_data["queries"]]
-
-print(get_all_pairs())
-
-rule metrics_all:
-    input:
-        expand(
-          os.path.join(RES_DIR,"metrics/messi_{name}_k{k}.csv"),
-          name = get_all_pairs(),
-          k = [10]  
-        )
-    output:
-        os.path.join(RES_DIR,"metrics/metrics-messi-all.csv")
-    threads: workflow.cores / 2
-    wildcard_constraints:
-        k="[0-9]+"
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
-
-
-rule eval_all_metrics:
-    input:
-        data = os.path.join(DATA_DIR, "{dataset}.bin"),
-        queries = os.path.join(DATA_DIR, "{queries}.bin"),
-        # data = get_data_path(DATA_DIR),
-        # queries = get_data_path(DATA_DIR),
-    output:
-        os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv")
-    threads: workflow.cores / 2
-    run:
-        import metrics
-        metrics.metrics_csv(
-          input['data'],
-          input['queries'],
-          output[0],
-          int(wildcards['k']))
-
-
-rule run_messi_shell:
-    input:
-        data = os.path.join(DATA_DIR, "{dataset}.bin"),
-        queries = os.path.join(DATA_DIR, "{queries}.bin"),
-        # data = get_data_path(DATA_DIR),
-        # queries = get_data_path(DATA_DIR),
-    output:
-        temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"))
-    wildcard_constraints:
-        k="[0-9]+"
-    threads: workflow.cores / 2
-    log:
-         temp(os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.log"))
-    run:
-
-        #if not os.path.exists(output):
-        slength = config["features"][wildcards.dataset]
-        data_samples = config["samples"][wildcards.dataset]
-        q_samples = config["samples"][wildcards.queries]    
-
-        shell("/home/qwang/projects/isax-modularized/build/isax \
---database_filepath='{input.data}' \
---query_filepath='{input.queries}' \
---database_size={data_samples} \
---query_size={q_samples} \
---sax_length={config[sax_length]} \
---sax_cardinality={config[sax_card]} \
---cpu_cores={config[cpu_cores]} \
---log_filepath='{log}' \
---series_length={slength} \
---adhoc_breakpoints \
---leaf_size={config[leaf_size]} \
---k={wildcards.k} \
---with_id ")
-
-        shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> {output} ")
-        #shell("rm {log}")
-
-
-# add messi output to other metrics.csv
-rule merge_messi:
-    input:
-        messi = os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.txt"),
-        metrics = os.path.join(RES_DIR,"metrics/{dataset}_{queries}_k{k}.csv"),
-    output:
-        os.path.join(RES_DIR,"metrics/messi_{dataset}_{queries}_k{k}.csv")
-    wildcard_constraints:
-        k="[0-9]+"
-    run:          
-        slength = config["features"][wildcards.dataset]
-        data_samples = config["samples"][wildcards.dataset]
-
-        l = []      
-        with open(input['messi']) as f:
-            for line in f.readlines():
-                x, y = line.split(" ")
-                c = (slength*int(x) + config['sax_length']*int(y))/(slength*data_samples)
-                l.append(c)
-
-        df = pd.read_csv(input['metrics'])    
-        df['messi'] = l
-        df.to_csv(output[0], index=False)
-
-
-# todo: rule to add noise to queries if not exists 
+# TODO: rule to add noise to queries if not exists. It can be its own function
+# in module `generator`
 
 
 rule prepare_data_file:
@@ -489,61 +378,37 @@ rule prepare_data_file:
         name = wildcards["name"]
         read_data.download(f"https://ann-benchmarks.com/{name}.hdf5", output[0])
 
-rule run_messi_one:
-	output:
-		"messi_results_config{index}.txt"
-	run:
-		import os
-		df = pd.read_csv("bin_configs.csv")
-		row = wildcards.get('index')
-		dsfile = df.query('Config=='+row)['DataFile'].values[0]
-		queryfile = df.query('Config=='+row)['QueryFile'].values[0]
-		slength=str(df.query('Config=='+row)['SeriesLength'].values[0])
-		#print(slength)
-		saxlength=16
 
-		shelline = "rm messi"+row+".log"
-		os.system(shelline)
-		
-		shelline = "rm messi_results_interm_config"+row+".txt"
-		os.system(shelline)
-	
-		shelline = "rm messi_results_config"+row+".txt"
-		os.system(shelline)
+rule convert_annbench_to_bin:
+    output:
+        expand(
+            os.path.join(DATA_DIR, "{name}.bin"),
+            name=[
+                "fashion_mnist-euclidean-784-60K",
+                "glove-angular-32-1183514",
+                "glove-angular-104-1183514",
+                "nytimes-angular-256-289761",
+            ]
+        )
+    run:
+        import read_data
+        features_map = {32: 25, 104: 100}
+        for data_output in output:
+            print("data output", data_output)
+            name, samples, features, distance_metric = read_data.parse_filename(data_output)
+            aname = name.replace("_", "-")
+            ann_feats = features_map.get(features, features)
+            ann_bench_name = f"{aname}-{ann_feats}-{distance_metric}"
+            tmp = os.path.join(DATA_DIR, f"{ann_bench_name}.hdf5")
+            read_data.download(f"https://ann-benchmarks.com/{ann_bench_name}.hdf5", tmp)
+            read_data.hdf5_to_bin(tmp, data_output, "train")
 
-		shelline = '../isax-modularized/build/isax --database_filepath='+dsfile+' --query_filepath='+queryfile+' --database_size=1000000 --query_size=1000 --sax_length='+str(saxlength)+' --sax_cardinality=8 --cpu_cores=4 --log_filepath=messi'+str(row)+'.log --series_length='+slength+' --adhoc_breakpoints --leaf_size=10000 --k=1 --with_id'
-		#print(shelline)
-		os.system(shelline)
-	
+            qsamples = read_data.read_multiformat(tmp, "test")[0].shape[0]
+            queries_output = os.path.join(
+                os.path.dirname(data_output),
+                f"queries_{name}-{distance_metric}-{features}-{qsamples}.bin"
+            )
+            print("queries output", queries_output)
+            read_data.hdf5_to_bin(tmp, queries_output, "test")
 
-		shelline = "grep -F 'l2square' messi"+row+".log | grep 'query_engine.c' | cut -d ' ' -f 8,11 >> messi_results_interm_config"+row+".txt"
-		os.system(shelline)
 
-		dict = {}
-		l = []
-		with open("messi_results_interm_config"+row+".txt") as f:
-			for line in f.readlines():
-				x, y = line.split(" ")
-				l.append(int(slength)*int(x) + int(saxlength)*int(y))
-		dict[row] = l
-        
-		df = pd.DataFrame.from_dict(dict,)
-		df.to_csv('messi_results_config'+row+'.txt',index=False)
-
-	
-rule run_messi_all:
-	input:
-		expand("messi_results_config{index}.txt", index = BIN_CONFIGS)		
-	output:
-		"messi_all.csv"
-	run:
-		for f in input:
-			print(pd.read_csv(f))
-		df = pd.concat((pd.read_csv(f) for f in input), axis=1)
-		#print(df)
-		df.to_csv(output[0], index=False)
-		
-		
-		
-		
-	
