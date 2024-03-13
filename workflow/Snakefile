@@ -251,6 +251,8 @@ rule run_messi_shell:
         _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
         _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
         assert slength == q_slength
+        data_samples = min(data_samples, rd.MAX_DATA_LEN)
+        print("Loading the first", data_samples, "vectors for MESSI")
 
         # how much cheaper is a SAX distance computation wrt a full distance
         # computation. We use this to aggregate the two types of distances into

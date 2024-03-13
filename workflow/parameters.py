@@ -186,12 +186,12 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        # "glove-angular-32-1183514",
+        "glove-angular-32-1183514",
         # "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
     ]
     scales = [0.1, 1.0, 10.0]
-    num_queries = [300]
+    num_queries = [30]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
@@ -235,9 +235,9 @@ def workloads():
     configs.extend(noise_configs[0])
     workloads_dict.update(noise_configs[1])
 
-    file_configs = _file_based_workloads()
-    configs.extend(file_configs[0])
-    workloads_dict.update(file_configs[1])
+    # file_configs = _file_based_workloads()
+    # configs.extend(file_configs[0])
+    # workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 
