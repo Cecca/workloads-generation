@@ -5,6 +5,9 @@ import requests
 from utils import compute_distances
 import sys
 
+# The maximum number of vectors to be read from each file
+MAX_DATA_LEN = 5000000
+
 DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data")  # /mnt/hddhelp/workgen_data/
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 
@@ -115,7 +118,7 @@ def read_from_bin(filename, sids, sdim):
     return data.reshape(sids, sdim)
 
 
-def read_multiformat(name, what, data_limit=None):
+def read_multiformat(name, what, data_limit=MAX_DATA_LEN):
     """
     Reads a (data or query) file with the given name. If the name does not correspond to an
     existing file, then a corresponding file is looked in the DATASETS or WORKLOADS dictionaries.
@@ -151,6 +154,8 @@ def read_multiformat(name, what, data_limit=None):
 
         if data_limit is None:
             data_limit = data_samples
+        elif data_limit > data_samples:
+            data_limit = data_samples
 
         data = np.fromfile(
             path, dtype="float32", count=data_features * data_limit
@@ -161,6 +166,8 @@ def read_multiformat(name, what, data_limit=None):
 
     if distance_metric == "angular":
         data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
+
+    print("Loaded", data.shape[0], "vectors in", data.shape[1], "dimensions")
 
     return data, distance_metric
 
