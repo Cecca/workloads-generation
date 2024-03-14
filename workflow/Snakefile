@@ -65,11 +65,8 @@ configfile: "workflow/config.yaml"
 
 rule all:
     input:
-        os.path.join(
-            RES_DIR,
-            "plots",
-            "all-metrics.png"
-        ),
+        os.path.join(RES_DIR, "plots", "all-metrics.png"),
+        os.path.join(RES_DIR, "plots", "index-performance.png"),
         os.path.join(RES_DIR, "metrics", "index-performance.csv")
 
 ######################################################################
@@ -212,6 +209,36 @@ rule plot_difficulty:
 # Indices
 #
 ######################################################################
+
+# This rule plots the number of distance computations against
+# the RC metric for different datasets, coloring points
+# according to their "difficulty group"
+rule plot_index_performance:
+    input:
+        metrics = os.path.join(RES_DIR, "metrics","index-performance.csv")
+    output:
+        os.path.join(RES_DIR, "plots","index-performance.png")
+    run:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        import seaborn.objects as so
+        import pandas as pd
+
+        df = pd.read_csv(input["metrics"])
+        # select the fastest configuration
+        #df = df.iloc[df.groupby(["dataset", "workload", "query_index", "index_name", "target_recall"])["distcomp"].idxmin()]
+        (
+          so.Plot(df,
+                  x="distcomp",
+                  y="index_name",
+                  color="index_name")
+            .facet("dataset", "workload")
+            .add(so.Dot())
+            .layout(size=(20, 10))
+            .save(output[0])
+        )
 
 rule index_performance:
     input:
