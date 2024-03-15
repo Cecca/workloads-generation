@@ -123,7 +123,7 @@ def generate_queries_annealing(
                 query = future.result()
             except Exception as exc:
                 logging.error(
-                    "Error in generating query from %d: %s\n%s" % (tasks[future], exc)
+                    "Error in generating query from %d: %s" % (tasks[future], exc)
                 )
             else:
                 queries.append(query)
@@ -264,7 +264,7 @@ def partition_by(candidates, fun):
 
 
 def faiss_ivf_scorer(
-    exact_index, dataset, distance_metric, k, recall=0.99, n_list=None
+    exact_index, dataset, distance_metric, k, recall=0.95, n_list=None
 ):
     """
     Score a point by the fraction of distance computations (wrt to the total) that the

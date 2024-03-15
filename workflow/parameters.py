@@ -133,7 +133,7 @@ def _annealing_workloads():
         "nytimes-angular-256-289761": [1],
     }
 
-    num_queries = [3]
+    num_queries = [30]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
@@ -188,7 +188,7 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        "glove-angular-32-1183514",
+        # "glove-angular-32-1183514",
         # "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
     ]
