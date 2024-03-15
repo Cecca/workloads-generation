@@ -274,6 +274,7 @@ rule run_messi_shell:
 --adhoc_breakpoints \
 --leaf_size={config[leaf_size]} \
 --k={k} \
+--exact_search \
 --with_id ")
 
         res = []
