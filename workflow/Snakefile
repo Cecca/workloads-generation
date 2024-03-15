@@ -289,6 +289,7 @@ rule run_messi_shell:
         # FIXME: how dow we get the running time per query?
 
         shell(MESSI_DIR + "/isax \
+--exact_search \
 --database_filepath='{input.data}' \
 --query_filepath='{input.workload}' \
 --database_size={data_samples} \
