@@ -188,11 +188,13 @@ class EmpiricalDifficultyIVF(object):
         Returns the number of distance computations, scaled by the number of datasets.
         Optionally uses distances computed elsewhere.
         """
+        start = time.time()
         if distances is None:
             distances = compute_distances(
                 x, None, self.distance_metric, self.exact_index
             )[0, :]
         assert distances.shape[0] == self.index.ntotal
+        elapsed_bf = time.time() - start
 
         def tester(nprobe):
             # we need to lock the execution because the statistics collection is
@@ -212,7 +214,15 @@ class EmpiricalDifficultyIVF(object):
             else:
                 return None
 
+        start = time.time()
         dist_frac = partition_by(list(range(1, self.n_list)), tester)
+        elapsed_dist_frac = time.time() - start
+        # print(
+        #     "Time for brute force",
+        #     elapsed_bf,
+        #     "time for finding the distances",
+        #     elapsed_dist_frac,
+        # )
         if dist_frac is not None:
             return dist_frac
         else:
