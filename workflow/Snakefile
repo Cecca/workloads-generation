@@ -289,7 +289,6 @@ rule run_messi_shell:
         # FIXME: how dow we get the running time per query?
 
         shell(MESSI_DIR + "/isax \
---exact_search \
 --database_filepath='{input.data}' \
 --query_filepath='{input.workload}' \
 --database_size={data_samples} \
@@ -309,6 +308,7 @@ rule run_messi_shell:
         for q_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11", read=True, iterable=True)):
             dists, sax_dist = tuple(map(int, log_line.split()))
             distcomp = dists + sax_rescale * sax_dist
+            distcomp = distcomp / data_samples
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
@@ -393,7 +393,7 @@ rule run_faiss_hnsw:
                     "efSearch": index.hnsw.efSearch
                 }, sort_keys=True),
                 "time_s": elapsed_secs,
-                "distcomp": n_dist_comp,
+                "distcomp": n_dist_comp / dataset.shape[0],
                 "recall": rec,
             })
         df = pd.DataFrame(res)
