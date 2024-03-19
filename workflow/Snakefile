@@ -244,7 +244,7 @@ rule index_performance:
     input:
         expand(
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv")    ,
-            index = ["messi", "faiss_hnsw"],
+            index = ["messi", "faiss_hnsw", "faiss_ivf"],
             pattern = WORKLOADS.instance_patterns
         )
     output:
@@ -398,6 +398,86 @@ rule run_faiss_hnsw:
             })
         df = pd.DataFrame(res)
         df.to_csv(output[0], index=False)
+
+
+rule run_faiss_ivf:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
+    output:
+        os.path.join(
+          RES_DIR, 
+          f"metrics/faiss_ivf/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
+    run:
+        import numpy as np
+        import read_data
+        import faiss
+        import utils
+        import time
+        import pandas as pd
+        import json
+
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
+        dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
+        queryset, _ = read_data.read_multiformat(input["workload"], "test")
+        print("Populating index")
+        n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+        index_params = f"IVF{n_list},Flat"
+        index = faiss.index_factory(dataset.shape[1], index_params)
+        index.train(dataset)
+        index.add(dataset)
+        print("done")
+        target_recall = 0.95
+
+        res = []
+
+        for q_idx in range(queryset.shape[0]):
+            print("running query", q_idx)
+            q = queryset[q_idx,:].reshape(1, -1)
+            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            index.nprobe = 1
+            rec = 0
+            n_dist_comp = 0
+            while rec < target_recall and index.nprobe < 10**6:
+                faiss.cvar.indexIVF_stats.reset()
+                print("  nprobe", index.nprobe)
+                dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
+                rec = utils.compute_recall(ground_distances, dists, k)
+                if rec >= target_recall or index.nprobe > 10**6:
+                    stats = faiss.cvar.indexIVF_stats
+                    n_dist_comp = stats.ndis
+                    break
+                # we only increment it if we are going to do another iteration
+                index.nprobe *= 2
+            print("Timing the runs")
+            nruns = 10
+            tstart = time.time()
+            for _ in range(nruns):
+                index.search(q, k)
+            tend = time.time()
+            elapsed_secs = ( tend - tstart ) / nruns
+            res.append({
+                "dataset": wildcards["dataset"],
+                "workload": WORKLOADS.description_for(wildcards["workload_key"]),
+                "query_index": q_idx,
+                "index_name": "faiss_ivf",
+                "target_recall": target_recall,
+                "index_params": json.dumps({
+                    "index_params": index_params,
+                    "nprobe": index.nprobe
+                }, sort_keys=True),
+                "time_s": elapsed_secs,
+                "distcomp": n_dist_comp / dataset.shape[0],
+                "recall": rec,
+            })
+        df = pd.DataFrame(res)
+        df.to_csv(output[0], index=False)
+
 
 
 # TODO: rule to add noise to queries if not exists. It can be its own function
