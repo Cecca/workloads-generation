@@ -62,8 +62,8 @@ def _file_based_workloads():
         # ("glove-angular-32-1183514", "queries_glove-angular-32-10000"),
         # ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
         # ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
-        ("sald-128-1m","sald-128-1k"),
-        ("sald-128-100m","sald-128-1k"),
+        ("sald-128-1m", "sald-128-1k"),
+        ("sald-128-100m", "sald-128-1k"),
     ]
     k_values = [10]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -100,15 +100,15 @@ def _annealing_workloads():
     workloads_dict = dict()
 
     datasets = [
-        # "fashion_mnist-euclidean-784-60K",
+        "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
-        # "glove-angular-104-1183514",
+        "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
     ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
-    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.4]]
+    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.2]]
     target_difficulty = {
         "faiss_ivf": {
             "fashion_mnist-euclidean-784-60K": faiss_ivf_difficulties,
@@ -116,6 +116,11 @@ def _annealing_workloads():
             "glove-angular-32-1183514": faiss_ivf_difficulties,
             "sald-128-1000000": faiss_ivf_difficulties,
             "nytimes-angular-256-289761": faiss_ivf_difficulties,
+        },
+        "rc": {
+            "fashion_mnist-euclidean-784-60K": [(2.1, 1.9), (1.05, 1.03), (1.01, 1.0)],
+            "glove-angular-104-1183514": [(2.1, 1.9), (1.8, 1.7), (1.5, 1.3)],
+            "nytimes-angular-256-289761": [(2.1, 1.9)],
         },
     }
     scales = {
@@ -133,7 +138,7 @@ def _annealing_workloads():
         "nytimes-angular-256-289761": [1],
     }
 
-    num_queries = [30]
+    num_queries = [10]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
@@ -187,13 +192,13 @@ def _gaussian_noise_workloads():
     workload_type = "synthetic-gaussian-noise"
 
     datasets = [
-        # "fashion_mnist-euclidean-784-60K",
+        "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
-        # "glove-angular-104-1183514",
+        "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
-        "sald-128-1000000"
+        "sald-128-1000000",
     ]
-    scales = [0.1]  # , 1.0, 10.0]
+    scales = [0.1, 1.0, 10.0]
     num_queries = [30]
     k_values = [10]
 
@@ -230,13 +235,13 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    # annealing_configs = _annealing_workloads()
-    # configs.extend(annealing_configs[0])
-    # workloads_dict.update(annealing_configs[1])
+    annealing_configs = _annealing_workloads()
+    configs.extend(annealing_configs[0])
+    workloads_dict.update(annealing_configs[1])
 
-    # noise_configs = _gaussian_noise_workloads()
-    # configs.extend(noise_configs[0])
-    # workloads_dict.update(noise_configs[1])
+    noise_configs = _gaussian_noise_workloads()
+    configs.extend(noise_configs[0])
+    workloads_dict.update(noise_configs[1])
 
     file_configs = _file_based_workloads()
     configs.extend(file_configs[0])

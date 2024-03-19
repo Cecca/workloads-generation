@@ -98,35 +98,42 @@ def generate_queries_annealing(
     target_low = score_transform(target_low)
     target_high = score_transform(target_high)
 
-    starting_ids = list(
-        gen.choice(np.arange(dataset.shape[0]), size=num_queries, replace=False)
-    )
-    print(starting_ids)
+    queries = []
 
-    with ThreadPoolExecutor(threads) as pool:
-        tasks = {
-            pool.submit(
-                annealing,
-                score,
-                dataset[x, :],
-                gen_neighbor,
-                target_low,
-                target_high,
-                fast_annealing_schedule(initial_temperature),
-                max_steps=max_steps,
-            ): x
-            for x in starting_ids
-        }
-        queries = []
-        for future in tasks:
-            try:
-                query = future.result()
-            except Exception as exc:
-                logging.error(
-                    "Error in generating query from %d: %s" % (tasks[future], exc)
-                )
-            else:
-                queries.append(query)
+    while len(queries) < num_queries:
+        nq = num_queries - len(queries)
+        starting_ids = list(
+            gen.choice(np.arange(dataset.shape[0]), size=nq, replace=False)
+        )
+        print(
+            f"Round to generate {nq} queries from {starting_ids} target ({target_low}, {target_high})"
+        )
+
+        with ThreadPoolExecutor(threads) as pool:
+            tasks = {
+                pool.submit(
+                    annealing,
+                    score,
+                    dataset[x, :],
+                    gen_neighbor,
+                    target_low,
+                    target_high,
+                    fast_annealing_schedule(initial_temperature),
+                    max_steps=max_steps,
+                ): x
+                for x in starting_ids
+            }
+            for future in tasks:
+                try:
+                    query = future.result()
+                except Exception as exc:
+                    # FIXME: we should still add something, or fill the output with some
+                    # data, because returning fewer vectors breaks the naming convention.
+                    logging.error(
+                        "Error in generating query from %d: %s" % (tasks[future], exc)
+                    )
+                else:
+                    queries.append(query)
     queries = np.vstack(queries)
     return queries
 

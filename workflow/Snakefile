@@ -75,8 +75,8 @@ rule all:
 #
 ######################################################################
 
-# Here we generate synthetic workloads sets
-rule generate_synthetic:
+# Here we generate workloads sets
+rule generate_workload:
     input:
         os.path.join(DATA_DIR, "{dataset}.bin")
     output:
@@ -235,7 +235,8 @@ rule plot_index_performance:
                   y="index_name",
                   color="index_name")
             .facet("dataset", "workload")
-            .add(so.Dot())
+            .add(so.Dot(), so.Jitter(0.2))
+            .add(so.Dot(marker="|", pointsize=30), so.Agg())
             .layout(size=(20, 10))
             .save(output[0])
         )
