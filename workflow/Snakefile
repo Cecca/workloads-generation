@@ -210,9 +210,6 @@ rule plot_difficulty:
 #
 ######################################################################
 
-# This rule plots the number of distance computations against
-# the RC metric for different datasets, coloring points
-# according to their "difficulty group"
 rule plot_index_performance:
     input:
         metrics = os.path.join(RES_DIR, "metrics","index-performance.csv")
