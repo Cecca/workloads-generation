@@ -62,6 +62,7 @@ def _file_based_workloads():
         ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
         ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
         ("sald-128-100m", "sald-128-1k"),
+        # TODO: add real world datasets
     ]
     k_values = [10]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -195,8 +196,9 @@ def _gaussian_noise_workloads():
         "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
         "glove-angular-104-1183514",
-        # "nytimes-angular-256-289761",
+        "nytimes-angular-256-289761",
         "sald-128-1000000",
+        # TODO: add real world datasets
     ]
     scales = [0.1, 1.0, 10.0]
     num_queries = [30]
