@@ -59,10 +59,8 @@ def _file_based_workloads():
             "fashion_mnist-euclidean-784-60K",
             "queries_fashion_mnist-euclidean-784-10000",
         ),
-        # ("glove-angular-32-1183514", "queries_glove-angular-32-10000"),
-        # ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
-        # ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
-        ("sald-128-1m", "sald-128-1k"),
+        ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
+        ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
         ("sald-128-100m", "sald-128-1k"),
     ]
     k_values = [10]
