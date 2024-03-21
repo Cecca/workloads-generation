@@ -166,7 +166,7 @@ rule eval_metrics_concat:
         )
     output:
         #"results/metrics/all-metrics.csv"
-        os.path.join(RES_DIR, "metrics","all-metrics.csv")
+        os.path.join(RES_DIR, "metrics", "all-metrics.csv")
     run:
         import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input["metrics"]))
@@ -477,10 +477,81 @@ rule run_faiss_ivf:
         df.to_csv(output[0], index=False)
 
 
+############################################################
+#
+# Correlation assessment
+#
+############################################################
 
-# TODO: rule to add noise to queries if not exists. It can be its own function
-# in module `generator`
+rule correlation_analysis:
+    input:
+        os.path.join(RES_DIR, "metrics", "all-metrics.csv"),
+    output:
+        scatter = os.path.join(RES_DIR, "plots", "correlations.png"),
+        correlations_bars = os.path.join(RES_DIR, "plots", "correlations-bars.png"),
+        table = os.path.join(RES_DIR, "metrics", "correlations.csv"),
+    run:
+        import pandas as pd
+        import numpy as np
+        import seaborn.objects as so
+        from scipy.stats import spearmanr, kendalltau
 
+        def ts_fun(ys):
+            for c in ys.columns:
+                #if c == "distcomp":
+                #    continue
+                ys[c], bins = pd.qcut(ys[c], 100, labels=False, duplicates="drop", retbins=True)
+            return ys.reset_index(drop=True)
+
+        metrics = pd.read_csv(input[0])
+        metrics = metrics[metrics["workload_description"].str.startswith("File")]
+        metrics.set_index("dataset", inplace=True)
+        metrics = metrics[metrics.columns[metrics.dtypes == np.float64]]
+        print(metrics)
+
+        correlations = metrics.groupby(metrics.index).corr("spearman")
+        correlations = correlations[["distcomp"]]
+        correlations.reset_index(inplace=True)
+        correlations.rename({"level_1": "measure", "distcomp": "distcomp_correlation"}, axis=1, inplace=True)
+        correlations = correlations[correlations["measure"] != "distcomp"]
+        correlations.to_csv(output["table"])
+        correlations["sign"] = correlations["distcomp_correlation"] > 0
+        correlations["distcomp_correlation"] = np.abs(correlations["distcomp_correlation"])
+
+
+        df = metrics.reset_index().melt(
+            value_vars=["lid_10", "rc_10", "exp_20|10", "eps_q0.25", "eps_q0.5", "eps_q0.75"], 
+            id_vars=["distcomp", "dataset"]
+        )
+        
+        (
+          so.Plot(df,
+                  y="distcomp",
+                  x="value")
+            .facet("variable", "dataset")
+            .share(x=False)
+            .scale(x="log", y="log")
+            .add(so.Dots(pointsize=1))
+            .layout(size=(16, 8))
+            .save(output["scatter"])
+        )
+
+        (
+          so.Plot(correlations,
+                  x="distcomp_correlation",
+                  y="measure",
+                  color="sign")
+            .facet(row="dataset")
+            .add(so.Bars())
+            .layout(size=(8, 8))
+            .save(output["correlations_bars"])
+        )
+
+############################################################
+#
+# Data preparation
+#
+############################################################
 
 rule prepare_data_file:
     output:

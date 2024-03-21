@@ -9,3 +9,5 @@ imgs
 .index-cache
 .joblib-cache
 messi/build
+/workgen_results
+report.html
