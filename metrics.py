@@ -8,10 +8,16 @@ import faiss
 import time
 import read_data as rd
 from utils import *
+import warnings
+import pandas as pd
+from threading import Lock
 
 
-def compute_epsilon_hardness(distances, epsilon):
-    min_dist = distances[0]
+def compute_epsilon_hardness(distances, epsilon, k=None):
+    if k is None:
+        warnings.warn("k was not set, defaulting to nearest neighbor")
+        k = 0
+    min_dist = distances[k]
     epsilon_dist = (1 + epsilon) * min_dist
     epsilon_nn = distances[distances <= epsilon_dist]
     epsilon_hardness = len(epsilon_nn) / len(distances)
@@ -75,12 +81,12 @@ def get_epsilons(queries, dataset, distance_metric, threads=None):
     sample = len(queries)
     max_e_arr = []
 
-    #for qq in queries:
+    # for qq in queries:
     for i in tqdm(range(sample)):
         dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-        max_e = dist[-1]/dist[0]-1
+        max_e = dist[-1] / dist[0] - 1
         max_e_arr.append(max_e)
-    
+
     # def compute_query(i):
     #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
     #     max_e = dist[-1] / dist[0] - 1
@@ -167,6 +173,12 @@ def _build_faiss_ivf_index(dataset, n_list):
     return faiss.read_index(faiss.FileIOReader(fname))
 
 
+# A global lock to protect faiss' counters, which unfortunately are shared
+# between threads. to get reliable counts we need to synchronize the update
+# of the counters using this lock.
+FAISS_LOCK = Lock()
+
+
 class EmpiricalDifficultyIVF(object):
     """
     Stores (and possibly caches on a file) a FAISS-IVF index to evaluate the difficulty
@@ -174,13 +186,10 @@ class EmpiricalDifficultyIVF(object):
     """
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
-        from threading import Lock
-
         self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
 
         self.index = _build_faiss_ivf_index(dataset, self.n_list)
         self.exact_index = exact_index
-        self.lock = Lock()
         self.recall = recall
         self.distance_metric = distance_metric
 
@@ -200,7 +209,7 @@ class EmpiricalDifficultyIVF(object):
         def tester(nprobe):
             # we need to lock the execution because the statistics collection is
             # not thread safe, in that it uses global variables.
-            with self.lock:
+            with FAISS_LOCK:
                 faiss.cvar.indexIVF_stats.reset()
                 self.index.nprobe = nprobe
                 run_dists = compute_distances(x, k, self.distance_metric, self.index)[0]
@@ -247,6 +256,8 @@ def metrics_csv(
     dataset, distance_metric = rd.read_multiformat(dataset_path, "train")
     queries, _ = rd.read_multiformat(queries_path, "test")
 
+    additional_dict = dict(zip(additional_header, additional_row))
+
     exact_index = faiss.IndexFlatL2(dataset.shape[1])
     exact_index.add(dataset)
     ivf_difficulty = EmpiricalDifficultyIVF(
@@ -259,25 +270,29 @@ def metrics_csv(
     epsilons, eps_quantiles = get_epsilons(
         queries[: int(sample * len(queries)) + 1], exact_index, distance_metric
     )
-    # epsilons = [.5, 1, 1.5] # temp to test
-    epsilons_str = "_".join(f"{e:.2f}" for e in epsilons)
-    print(f"e-values (based on {sample} query sample): {epsilons_str}")
+    print(f"epsilons for {dataset_path} are {epsilons}")
 
     def compute_row(i):
         """Computes the metrics of a single query, i.e. a single row of
         the output csv file"""
         query = queries[i, :].astype(np.float32)
         q_distances = compute_distances(query, None, distance_metric, exact_index)[0]
-        # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k)
-        lid = compute_lid(q_distances, k, "linear")
-        rc = compute_rc(q_distances, k, "linear")
-        expansion = compute_expansion(q_distances, k, "linear")
-        empirical_difficulty = ivf_difficulty.evaluate(query, k, q_distances)
-        epsilons_hard = [compute_epsilon_hardness(q_distances, e) for e in epsilons]
 
-        row = [i, lid, rc, expansion, empirical_difficulty]
-        row.extend(additional_row)
-        row.extend(epsilons_hard)
+        row = {
+            "query_id": i,
+            "k": k,
+            "lid": compute_lid(q_distances, k, "linear"),
+            "rc": compute_rc(q_distances, k, "linear"),
+            "exp": compute_expansion(q_distances, k, "linear"),
+            "eps@0.1": compute_epsilon_hardness(q_distances, 0.1, k),
+            "eps@0.5": compute_epsilon_hardness(q_distances, 0.5, k),
+            "eps@1": compute_epsilon_hardness(q_distances, 1.0, k),
+            "eps@2": compute_epsilon_hardness(q_distances, 2.0, k),
+            "distcomp_ivf": ivf_difficulty.evaluate(query, k, q_distances),
+        }
+        for q, e in zip(eps_quantiles, epsilons):
+            row[f"eps_q{q}"] = compute_epsilon_hardness(q_distances, e, k)
+        row.update(additional_dict)
         return row
 
     if threads is None:
@@ -291,20 +306,8 @@ def metrics_csv(
         for task in tqdm(as_completed(tasks), total=len(tasks)):
             row = task.result()
             rows.append(row)
-        rows.sort()
-
-    with open(output_path, "w", newline="") as fp:
-        writer = csv.writer(fp)
-
-        header = ["i", "lid_" + str(k), "rc_" + str(k), f"exp_{2*k}|{k}"]
-
-        header.extend(["distcomp"])
-        header.extend(additional_header)
-        header.extend([f"eps_q{e}" for e in eps_quantiles])
-        writer.writerow(header)
-
-        for row in rows:
-            writer.writerow(row)
+    df = pd.DataFrame(rows)
+    df.to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":
