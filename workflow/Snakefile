@@ -288,6 +288,11 @@ rule run_messi_shell:
 
         # FIXME: how dow we get the running time per query?
 
+        try:
+            os.remove(log[0])
+        except FileNotFoundError:
+            pass
+
         shell(MESSI_DIR + "/isax \
 --database_filepath='{input.data}' \
 --query_filepath='{input.workload}' \
@@ -319,6 +324,11 @@ rule run_messi_shell:
                 "distcomp": distcomp,
                 "recall": 1.0,
             })
+        try:
+            os.remove(output[0])
+        except FileNotFoundError:
+            pass
+
         df = pd.DataFrame(res)
         df.to_csv(output[0], index=False)
 
