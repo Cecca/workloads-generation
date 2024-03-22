@@ -104,20 +104,27 @@ def _annealing_workloads():
     datasets = [
         "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
-        # "glove-angular-104-1183514",
+        "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
+        # "sald-128-1000000",
     ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
-    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.4]]
+    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.2]]
     target_difficulty = {
         "faiss_ivf": {
             "fashion_mnist-euclidean-784-60K": faiss_ivf_difficulties,
             "glove-angular-104-1183514": faiss_ivf_difficulties,
             "glove-angular-32-1183514": faiss_ivf_difficulties,
-            "sald-128-1000000": faiss_ivf_difficulties,
+            # "sald-128-1000000": faiss_ivf_difficulties,
             "nytimes-angular-256-289761": faiss_ivf_difficulties,
+        },
+        "rc": {
+            "fashion_mnist-euclidean-784-60K": [(2.1, 1.9), (1.05, 1.03), (1.01, 1.0)],
+            "glove-angular-104-1183514": [(2.1, 1.9), (1.8, 1.7), (1.5, 1.3)],
+            "nytimes-angular-256-289761": [(2.1, 1.9)],
+            "sald-128-1000000": [(100, 1)],
         },
     }
     scales = {
@@ -135,7 +142,7 @@ def _annealing_workloads():
         "nytimes-angular-256-289761": [1],
     }
 
-    num_queries = [30]
+    num_queries = [10]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
