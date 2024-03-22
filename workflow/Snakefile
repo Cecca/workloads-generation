@@ -383,13 +383,6 @@ rule run_faiss_hnsw:
                     break
                 # we only increment it if we are going to do another iteration
                 index.hnsw.efSearch *= 2
-            print("Timing the runs")
-            nruns = 10
-            tstart = time.time()
-            for _ in range(nruns):
-                index.search(q, k)
-            tend = time.time()
-            elapsed_secs = ( tend - tstart ) / nruns
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
@@ -400,7 +393,6 @@ rule run_faiss_hnsw:
                     "index_params": index_params,
                     "efSearch": index.hnsw.efSearch
                 }, sort_keys=True),
-                "time_s": elapsed_secs,
                 "distcomp": n_dist_comp / dataset.shape[0],
                 "recall": rec,
             })
@@ -462,13 +454,6 @@ rule run_faiss_ivf:
                     break
                 # we only increment it if we are going to do another iteration
                 index.nprobe *= 2
-            print("Timing the runs")
-            nruns = 10
-            tstart = time.time()
-            for _ in range(nruns):
-                index.search(q, k)
-            tend = time.time()
-            elapsed_secs = ( tend - tstart ) / nruns
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
@@ -479,7 +464,6 @@ rule run_faiss_ivf:
                     "index_params": index_params,
                     "nprobe": index.nprobe
                 }, sort_keys=True),
-                "time_s": elapsed_secs,
                 "distcomp": n_dist_comp / dataset.shape[0],
                 "recall": rec,
             })
