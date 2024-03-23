@@ -167,6 +167,8 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN):
     if distance_metric == "angular":
         data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
 
+    assert np.all(np.isfinite(data)), f"Some values are infinite or NaN in file: {path}"
+
     print("Loaded", data.shape[0], "vectors in", data.shape[1], "dimensions")
 
     return data, distance_metric
