@@ -33,6 +33,10 @@ def generate_queries_gaussian_noise(
     if distance_metric == "angular":
         pts /= np.linalg.norm(pts, axis=1)[:, np.newaxis]
 
+    assert np.all(
+        np.isfinite(pts)
+    ), f"Some values are infinite or NaN in the queries just generated with gaussian noise with scale {scale}"
+
     return pts
 
 
