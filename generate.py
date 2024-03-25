@@ -180,6 +180,7 @@ def annealing(
     steps_threshold = max(max_steps // 100, 10)
     logging.debug("steps threshold %d", steps_threshold)
 
+    t_start = time.time()
     for step in range(max_steps):
         if steps_since_last_improvement >= steps_threshold:
             logging.debug("moving back to the previous best due to lack of improvement")
@@ -190,7 +191,12 @@ def annealing(
         y_next = score(x_next)
         # FIXME: handle case of navigating towards easier points
         if target_low <= y_next <= target_high:
-            logging.info("Returning query point with score %f", y_next)
+            logging.info(
+                "Returning query point with score %f after %d iterations (%.2f s)",
+                y_next,
+                step,
+                time.time() - t_start,
+            )
             return x_next
         # elif y <= y_next <= target_low or target_high <= y_next <= y:
         elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(
@@ -293,7 +299,10 @@ def faiss_ivf_scorer(
 
 def neighbor_generator_angular(scale, rng):
     def inner(x):
-        offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        coord = rng.integers(x.shape)
+        offset = np.zeros_like(x)
+        offset[coord] = rng.normal(scale=scale)
+        # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
         neighbor = x + offset
         neighbor /= np.linalg.norm(neighbor)
         return neighbor
