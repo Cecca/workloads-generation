@@ -351,6 +351,7 @@ rule run_faiss_hnsw:
         import time
         import pandas as pd
         import json
+        from metrics import FAISS_LOCK
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -374,14 +375,15 @@ rule run_faiss_hnsw:
             rec = 0
             n_dist_comp = 0
             while rec < target_recall and index.hnsw.efSearch < 10**6:
-                faiss.cvar.hnsw_stats.reset()
-                print("  efSearch", index.hnsw.efSearch)
-                dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
-                rec = utils.compute_recall(ground_distances, dists, k)
-                if rec >= target_recall or index.hnsw.efSearch > 10**6:
-                    stats = faiss.cvar.hnsw_stats
-                    n_dist_comp = stats.n1 + stats.n2 + stats.n3 + stats.ndis
-                    break
+                with FAISS_LOCK:
+                    faiss.cvar.hnsw_stats.reset()
+                    print("  efSearch", index.hnsw.efSearch)
+                    dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
+                    rec = utils.compute_recall(ground_distances, dists, k)
+                    if rec >= target_recall or index.hnsw.efSearch > 10**6:
+                        stats = faiss.cvar.hnsw_stats
+                        n_dist_comp = stats.n1 + stats.n2 + stats.n3 + stats.ndis
+                        break
                 # we only increment it if we are going to do another iteration
                 index.hnsw.efSearch *= 2
             res.append({
@@ -421,6 +423,7 @@ rule run_faiss_ivf:
         import time
         import pandas as pd
         import json
+        from metrics import FAISS_LOCK
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -445,14 +448,15 @@ rule run_faiss_ivf:
             rec = 0
             n_dist_comp = 0
             while rec < target_recall and index.nprobe < 10**6:
-                faiss.cvar.indexIVF_stats.reset()
-                print("  nprobe", index.nprobe)
-                dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
-                rec = utils.compute_recall(ground_distances, dists, k)
-                if rec >= target_recall or index.nprobe > 10**6:
-                    stats = faiss.cvar.indexIVF_stats
-                    n_dist_comp = stats.ndis
-                    break
+                with FAISS_LOCK:
+                    faiss.cvar.indexIVF_stats.reset()
+                    print("  nprobe", index.nprobe)
+                    dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
+                    rec = utils.compute_recall(ground_distances, dists, k)
+                    if rec >= target_recall or index.nprobe > 10**6:
+                        stats = faiss.cvar.indexIVF_stats
+                        n_dist_comp = stats.ndis
+                        break
                 # we only increment it if we are going to do another iteration
                 index.nprobe *= 2
             res.append({
@@ -497,7 +501,7 @@ rule correlation_analysis:
             return ys.reset_index(drop=True)
 
         metrics = pd.read_csv(input[0])
-        metrics = metrics[metrics["workload_description"].str.startswith("File")]
+        #metrics = metrics[metrics["workload_description"].str.startswith("File")]
         metrics.set_index("dataset", inplace=True)
         metrics = metrics[metrics.columns[metrics.dtypes == np.float64]]
         print(metrics)

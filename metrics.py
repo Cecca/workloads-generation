@@ -7,6 +7,7 @@ import csv
 import faiss
 import time
 import read_data as rd
+from threading import Lock
 from utils import *
 
 
@@ -75,12 +76,12 @@ def get_epsilons(queries, dataset, distance_metric, threads=None):
     sample = len(queries)
     max_e_arr = []
 
-    #for qq in queries:
+    # for qq in queries:
     for i in tqdm(range(sample)):
         dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-        max_e = dist[-1]/dist[0]-1
+        max_e = dist[-1] / dist[0] - 1
         max_e_arr.append(max_e)
-    
+
     # def compute_query(i):
     #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
     #     max_e = dist[-1] / dist[0] - 1
@@ -167,6 +168,10 @@ def _build_faiss_ivf_index(dataset, n_list):
     return faiss.read_index(faiss.FileIOReader(fname))
 
 
+# This lock protects the accesses to faiss global performance counters
+FAISS_LOCK = Lock()
+
+
 class EmpiricalDifficultyIVF(object):
     """
     Stores (and possibly caches on a file) a FAISS-IVF index to evaluate the difficulty
@@ -174,13 +179,10 @@ class EmpiricalDifficultyIVF(object):
     """
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
-        from threading import Lock
-
         self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
 
         self.index = _build_faiss_ivf_index(dataset, self.n_list)
         self.exact_index = exact_index
-        self.lock = Lock()
         self.recall = recall
         self.distance_metric = distance_metric
 
@@ -200,7 +202,7 @@ class EmpiricalDifficultyIVF(object):
         def tester(nprobe):
             # we need to lock the execution because the statistics collection is
             # not thread safe, in that it uses global variables.
-            with self.lock:
+            with FAISS_LOCK:
                 faiss.cvar.indexIVF_stats.reset()
                 self.index.nprobe = nprobe
                 run_dists = compute_distances(x, k, self.distance_metric, self.index)[0]
