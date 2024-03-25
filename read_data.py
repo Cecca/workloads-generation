@@ -118,7 +118,7 @@ def read_from_bin(filename, sids, sdim):
     return data.reshape(sids, sdim)
 
 
-def read_multiformat(name, what, data_limit=MAX_DATA_LEN):
+def read_multiformat(name, what, data_limit=MAX_DATA_LEN, repair=True):
     """
     Reads a (data or query) file with the given name. If the name does not correspond to an
     existing file, then a corresponding file is looked in the DATASETS or WORKLOADS dictionaries.
@@ -167,6 +167,14 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN):
     if distance_metric == "angular":
         data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
 
+    if repair:
+        # replace NaN with
+        mask = np.isnan(data)
+        nreplace = np.sum(mask)
+        if nreplace > 0:
+            print("Replaced", nreplace, "NaNs")
+        data[mask] = 0.0
+
     assert np.all(np.isfinite(data)), f"Some values are infinite or NaN in file: {path}"
 
     print("Loaded", data.shape[0], "vectors in", data.shape[1], "dimensions")
@@ -194,7 +202,7 @@ def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=Tr
             actual_n == expected_n
         ), f"The output file should be named appropriately, i.e. it should contain the number of points ({actual_n}) in the filename"
         assert (
-            input_distance_metric == distance_metric,
+            input_distance_metric == distance_metric
         ), f"The output file should be named appropriately, i.e. it should contain the distance metric ({input_distance_metric}) in the filename"
     data.tofile(output_path)
     # check that the conversion produced the same files
