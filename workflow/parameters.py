@@ -3,6 +3,7 @@ from snakemake.utils import Paramspace
 from itertools import product
 import pickle
 import hashlib
+from collections import OrderedDict
 
 
 class WorkloadPatterns:
@@ -62,10 +63,10 @@ def _file_based_workloads():
         ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
         ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
         ("sald-128-100m", "sald-128-1k"),
-        # TODO: add synthetic ? 
-        ("astro-256-100m","astro-256-1k"),
-        ("deep1b-96-100m","deep1b-96-1k"),
-        ("seismic-256-100m","seismic-256-1k"),
+        # TODO: add synthetic ?
+        ("astro-256-100m", "astro-256-1k"),
+        ("deep1b-96-100m", "deep1b-96-1k"),
+        ("seismic-256-100m", "seismic-256-1k"),
     ]
     k_values = [10]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -154,17 +155,19 @@ def _annealing_workloads():
                 initial_temperature[dataset],
                 target_difficulty[tf][dataset],
             ):
-                conf = {
-                    "workload_type": workload_type,
-                    "dataset": dataset,
-                    "k": k,
-                    "num_queries": nq,
-                    "difficulty": tf,
-                    "target_low": lower,
-                    "target_high": upper,
-                    "scale": scale,
-                    "initial_temperature": temp,
-                }
+                conf = OrderedDict(  # to maintain a consistent hash value
+                    {
+                        "workload_type": workload_type,
+                        "dataset": dataset,
+                        "k": k,
+                        "num_queries": nq,
+                        "difficulty": tf,
+                        "target_low": lower,
+                        "target_high": upper,
+                        "scale": scale,
+                        "initial_temperature": temp,
+                    }
+                )
                 key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
                 workloads_dict[key] = conf
                 dname, _, features, distance_metric = rd.parse_filename(dataset)
@@ -203,7 +206,7 @@ def _gaussian_noise_workloads():
         "sald-128-100m",
         "astro-256-100m",
         "deep1b-96-100m",
-        "seismic-256-100m"
+        "seismic-256-100m",
     ]
     scales = [0.1, 1.0, 10.0]
     num_queries = [30]

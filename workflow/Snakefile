@@ -68,6 +68,7 @@ rule all:
         os.path.join(RES_DIR, "plots", "all-metrics.png"),
         os.path.join(RES_DIR, "plots", "index-performance.png"),
         os.path.join(RES_DIR, "plots", "correlations-bars.png"),
+        os.path.join(RES_DIR, "plots", "sota-distcomps.png"),
         os.path.join(RES_DIR, "metrics", "index-performance.csv")
 
 ######################################################################
@@ -205,6 +206,42 @@ rule plot_difficulty:
             .save(output[0])
         )
 
+rule plot_distcomps:
+    input:
+        metrics = os.path.join(RES_DIR, "metrics","all-metrics.csv")
+    output:
+        os.path.join(RES_DIR, "plots", "sota-distcomps.png")
+    run:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        import seaborn.objects as so
+        import pandas as pd
+
+        df = pd.read_csv(input["metrics"])
+        df = df[df["workload_description"].str.startswith("File")]
+
+        sns.violinplot(
+            data = df,
+            x = "distcomp",
+            y = "dataset",
+            split = True,
+            inner = None,
+            cut = 0,
+        )
+        plt.tight_layout()
+        plt.savefig(output[0])
+        #(
+        #  so.Plot(df,
+        #          x="distcomp")
+        #    .add(so.Area(), so.KDE(cut=0), color="dataset")
+        #    .facet(row="dataset")
+        #    .share(y=False)
+        #    .layout(size=(6,12))
+        #    .save(output[0])
+        #)
+
 ######################################################################
 #
 # Indices
@@ -224,18 +261,45 @@ rule plot_index_performance:
         import seaborn.objects as so
         import pandas as pd
 
+        def get_family(c):
+            if c.startswith("Gaussian"):
+                return "GaussianNoise"
+            if c.startswith("Annealing(faiss_ivf"):
+                return "Annealing(faiss_ivf)"
+            if c.startswith("Annealing(rc"):
+                return "Annealing(rc)"
+            return c
+
         df = pd.read_csv(input["metrics"])
+        df.replace(
+            {
+                "GaussianNoise(0.1)": "GaussianNoise(easy)",
+                "GaussianNoise(1.0)": "GaussianNoise(medium)",
+                "GaussianNoise(10.0)": "GaussianNoise(difficult)",
+                "Annealing(rc, 2.10, 1.90)": "Annealing(rc, easy)",
+                "Annealing(rc, 1.80, 1.70)": "Annealing(rc, medium)",
+                "Annealing(rc, 1.50, 1.30)": "Annealing(rc, difficult)",
+                "Annealing(rc, 1.05, 1.03)": "Annealing(rc, medium)",
+                "Annealing(rc, 1.01, 1.00)": "Annealing(rc, difficult)",
+                "Annealing(faiss_ivf, 0.04, 0.06)": "Annealing(faiss_ivf, easy)",
+                "Annealing(faiss_ivf, 0.19, 0.21)": "Annealing(faiss_ivf, medium)",
+            },
+            inplace=True
+        )
+        df.replace("File.*", "File", regex=True, inplace=True)
+        df["family"] = df["workload"].map(get_family)
         # select the fastest configuration
         #df = df.iloc[df.groupby(["dataset", "workload", "query_index", "index_name", "target_recall"])["distcomp"].idxmin()]
         (
           so.Plot(df,
                   x="distcomp",
-                  y="index_name",
-                  color="index_name")
-            .facet("dataset", "workload")
+                  y="workload",
+                  color="family")
+            .facet("dataset", "index_name")
+            .share(x=False)
             .add(so.Dot(), so.Jitter(0.2))
-            .add(so.Dot(marker="|", pointsize=30), so.Agg())
-            .layout(size=(20, 10))
+            .add(so.Dot(marker="*", pointsize=10, color="black"), so.Agg())
+            .layout(size=(25, 10))
             .save(output[0])
         )
 
@@ -537,7 +601,7 @@ rule correlation_analysis:
             .share(x=False)
             .scale(x="log", y="log")
             .add(so.Dots(pointsize=1))
-            .layout(size=(16, 8))
+            .layout(size=(16, 16))
             .save(output["scatter"])
         )
 
@@ -548,7 +612,7 @@ rule correlation_analysis:
                   color="sign")
             .facet(row="dataset")
             .add(so.Bars())
-            .layout(size=(8, 8))
+            .layout(size=(8, 12))
             .save(output["correlations_bars"])
         )
 

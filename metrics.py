@@ -11,8 +11,8 @@ from threading import Lock
 from utils import *
 
 
-def compute_epsilon_hardness(distances, epsilon):
-    min_dist = distances[0]
+def compute_epsilon_hardness(distances, epsilon, k=1):
+    min_dist = distances[k - 1]
     epsilon_dist = (1 + epsilon) * min_dist
     epsilon_nn = distances[distances <= epsilon_dist]
     epsilon_hardness = len(epsilon_nn) / len(distances)

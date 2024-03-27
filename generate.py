@@ -312,8 +312,12 @@ def neighbor_generator_angular(scale, rng):
 
 def neighbor_generator_euclidean(scale, rng):
     def inner(x):
-        offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        direction = rng.normal(size=x.shape[0]).astype(np.float32)
+        direction /= np.linalg.norm(direction)
+        amount = rng.exponential(scale=scale)
+        offset = direction * amount
         neighbor = x + offset
+        logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
         return neighbor
 
     return inner
