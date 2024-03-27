@@ -68,6 +68,7 @@ rule all:
         os.path.join(RES_DIR, "plots", "all-metrics.png"),
         os.path.join(RES_DIR, "plots", "index-performance.png"),
         os.path.join(RES_DIR, "plots", "correlations-bars.png"),
+        os.path.join(RES_DIR, "plots", "sota-distcomps.png"),
         os.path.join(RES_DIR, "metrics", "index-performance.csv")
 
 ######################################################################
@@ -204,6 +205,42 @@ rule plot_difficulty:
             .add(so.Dot())
             .save(output[0])
         )
+
+rule plot_distcomps:
+    input:
+        metrics = os.path.join(RES_DIR, "metrics","all-metrics.csv")
+    output:
+        os.path.join(RES_DIR, "plots", "sota-distcomps.png")
+    run:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+        import seaborn as sns
+        import seaborn.objects as so
+        import pandas as pd
+
+        df = pd.read_csv(input["metrics"])
+        df = df[df["workload_description"].str.startswith("File")]
+
+        sns.violinplot(
+            data = df,
+            x = "distcomp",
+            y = "dataset",
+            split = True,
+            inner = None,
+            cut = 0,
+        )
+        plt.tight_layout()
+        plt.savefig(output[0])
+        #(
+        #  so.Plot(df,
+        #          x="distcomp")
+        #    .add(so.Area(), so.KDE(cut=0), color="dataset")
+        #    .facet(row="dataset")
+        #    .share(y=False)
+        #    .layout(size=(6,12))
+        #    .save(output[0])
+        #)
 
 ######################################################################
 #
