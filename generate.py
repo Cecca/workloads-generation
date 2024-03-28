@@ -66,6 +66,12 @@ def generate_workload_gaussian_noise(
         raise ValueError(f"Unknown format `{queries_output}`")
 
 
+def _estimate_diameter(data, index, distance_metric):
+    q = data[0]
+    distances = utils.compute_distances(q, None, distance_metric, index)[0]
+    return distances[-1] * 2
+
+
 def generate_queries_annealing(
     dataset,
     distance_metric,
@@ -74,9 +80,9 @@ def generate_queries_annealing(
     target_low,
     target_high,
     num_queries,
-    scale,
+    scale="auto",
     max_steps=10000,
-    initial_temperature=10,
+    initial_temperature=1.0,
     seed=1234,
     threads=os.cpu_count(),
 ):
@@ -84,6 +90,14 @@ def generate_queries_annealing(
 
     index = faiss.IndexFlatL2(dataset.shape[1])
     index.add(dataset)
+
+    if scale == "auto":
+        if distance_metric == "angular":
+            scale = 0.1
+        else:
+            diameter = _estimate_diameter(dataset, index, distance_metric)
+            scale = diameter / 100
+        logging.info("using automatic scale: %f", scale)
 
     neighbor_generators = {
         "angular": neighbor_generator_angular(scale, gen),
@@ -109,7 +123,8 @@ def generate_queries_annealing(
         starting_ids = list(
             gen.choice(np.arange(dataset.shape[0]), size=nq, replace=False)
         )
-        print(
+        logging.debug("Starting from %s", starting_ids)
+        logging.info(
             f"Round to generate {nq} queries from {starting_ids} target ({target_low}, {target_high})"
         )
 
@@ -138,6 +153,7 @@ def generate_queries_annealing(
                     )
                 else:
                     queries.append(query)
+        break
     queries = np.vstack(queries)
     return queries
 
@@ -204,7 +220,11 @@ def annealing(
         ):
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
-            logging.debug("new best score %f", y)
+            logging.debug(
+                "new best score %f, (still %f to go)",
+                y,
+                min(abs(y_next - target_low), abs(y_next - target_high)),
+            )
             x_best, y_best = x, y
             steps_since_last_improvement = 0
         else:
@@ -222,6 +242,9 @@ def annealing(
                     p,
                     delta,
                 )
+            else:
+                # logging.debug("rejecting proposal (temperature %f, p %f)", t, p)
+                pass
             steps_since_last_improvement += 1
 
     raise Exception(
@@ -298,13 +321,18 @@ def faiss_ivf_scorer(
 
 
 def neighbor_generator_angular(scale, rng):
+    neigh_eucl = neighbor_generator_euclidean(scale, rng)
+
     def inner(x):
-        coord = rng.integers(x.shape)
-        offset = np.zeros_like(x)
-        offset[coord] = rng.normal(scale=scale)
-        # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
-        neighbor = x + offset
+        neighbor = neigh_eucl(x)
+        # coord = rng.integers(x.shape)
+        # offset = np.zeros_like(x)
+        # offset[coord] = rng.normal(scale=scale)
+        # # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        # neighbor = x + offset
         neighbor /= np.linalg.norm(neighbor)
+        d = 1.0 - np.dot(x, neighbor)
+        # logging.debug("angular distance: %f", d)
         return neighbor
 
     return inner
@@ -317,7 +345,7 @@ def neighbor_generator_euclidean(scale, rng):
         amount = rng.exponential(scale=scale)
         offset = direction * amount
         neighbor = x + offset
-        logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
+        # logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
         return neighbor
 
     return inner
