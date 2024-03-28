@@ -49,6 +49,17 @@ def generate_workload_gaussian_noise(
 ):
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
+    if scale in ["easy", "medium", "hard"]:
+        index = faiss.IndexFlatL2(dataset.shape[1])
+        index.add(dataset)
+        diameter = _estimate_diameter(dataset, index, distance_metric)
+        logging.info("diameter is %f", diameter)
+        scale = {
+            "easy": diameter / 100000,
+            "medium": diameter / 10000,
+            "hard": diameter / 1000,
+        }[scale]
+        logging.info("scale is %f", scale)
 
     queries = generate_queries_gaussian_noise(
         dataset,
@@ -81,7 +92,7 @@ def generate_queries_annealing(
     target_high,
     num_queries,
     scale="auto",
-    max_steps=10000,
+    max_steps=1000,
     initial_temperature=1.0,
     seed=1234,
     threads=os.cpu_count(),
@@ -700,7 +711,7 @@ def generate_workload_annealing(
     num_queries,
     initial_temperature=1.0,
     scale="auto",
-    max_steps=10000,
+    max_steps=1000,
     seed=1234,
     threads=os.cpu_count(),
 ):

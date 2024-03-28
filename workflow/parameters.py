@@ -162,7 +162,6 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        # "glove-angular-32-1183514",
         "glove-angular-104-1183514",
         "nytimes-angular-256-289761",
         "sald-128-100m",
@@ -170,8 +169,9 @@ def _gaussian_noise_workloads():
         "deep1b-96-100m",
         "seismic-256-100m",
     ]
-    scales = [0.1, 1.0, 10.0]
-    num_queries = [30]
+    # scales = [0.1, 1.0, 10.0]
+    scales = ["easy", "medium", "hard"]
+    num_queries = [100]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
@@ -188,11 +188,13 @@ def _gaussian_noise_workloads():
             dname, _, features, distance_metric = rd.parse_filename(dataset)
             workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
             configs.append(
-                {
-                    "dataset": dataset,
-                    "workload_key": key,
-                    "workload_file": workload_fname,
-                }
+                OrderedDict(
+                    {
+                        "dataset": dataset,
+                        "workload_key": key,
+                        "workload_file": workload_fname,
+                    }
+                )
             )
 
     return configs, workloads_dict
@@ -207,17 +209,17 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    annealing_configs = _annealing_workloads()
-    configs.extend(annealing_configs[0])
-    workloads_dict.update(annealing_configs[1])
+    # annealing_configs = _annealing_workloads()
+    # configs.extend(annealing_configs[0])
+    # workloads_dict.update(annealing_configs[1])
 
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
     workloads_dict.update(noise_configs[1])
 
-    file_configs = _file_based_workloads()
-    configs.extend(file_configs[0])
-    workloads_dict.update(file_configs[1])
+    # file_configs = _file_based_workloads()
+    # configs.extend(file_configs[0])
+    # workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 
