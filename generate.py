@@ -118,7 +118,10 @@ def generate_queries_annealing(
 
     queries = []
 
-    while len(queries) < num_queries:
+    MAX_ROUNDS = 10
+    round = 0
+    while len(queries) < num_queries and round < MAX_ROUNDS:
+        round += 1
         nq = num_queries - len(queries)
         starting_ids = list(
             gen.choice(np.arange(dataset.shape[0]), size=nq, replace=False)
@@ -146,8 +149,6 @@ def generate_queries_annealing(
                 try:
                     query = future.result()
                 except Exception as exc:
-                    # FIXME: we should still add something, or fill the output with some
-                    # data, because returning fewer vectors breaks the naming convention.
                     logging.error(
                         "Error in generating query from %d: %s" % (tasks[future], exc)
                     )
@@ -155,6 +156,7 @@ def generate_queries_annealing(
                     queries.append(query)
         break
     queries = np.vstack(queries)
+    assert queries.shape[0] == num_queries
     return queries
 
 
