@@ -678,22 +678,49 @@ def generate_workload(
     write_queries_hdf5(queries, queries_output)
 
 
+def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
+    index = faiss.IndexFlatL2(data.shape[1])
+    index.add(data)
+    gen = np.random.default_rng(seed)
+    indices = gen.integers(data.shape[0], size=sample_size)
+    qs = data[indices, :]
+    distances = utils.compute_distances(qs, None, distance_metric, index)
+    knn_dists = distances[:, k]
+    avg_dists = distances.mean(axis=1)
+    rcs = avg_dists / knn_dists
+    return rcs.mean()
+
+
 def generate_workload_annealing(
     dataset_input,
     queries_output,
     k,
     metric,
-    target_low,
-    target_high,
+    target_class,
     num_queries,
-    initial_temperature=1,
-    scale=10,
-    max_steps=300,
+    initial_temperature=1.0,
+    scale="auto",
+    max_steps=10000,
     seed=1234,
     threads=os.cpu_count(),
 ):
+    assert target_class in ["easy", "medium", "hard"]
+
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
+
+    if metric == "rc":
+        avg_rc = _average_rc(dataset, distance_metric, k)
+        target_rc = {
+            "easy": avg_rc,
+            "medium": (avg_rc - 1) / 10 + 1,
+            "hard": (avg_rc - 1) / 100 + 1,
+        }[target_class]
+        delta = 0.01 * target_rc
+        target_low = target_rc + delta
+        target_high = target_rc - delta
+    else:
+        raise NotImplemented("not yet implemented")
 
     queries = generate_queries_annealing(
         dataset,

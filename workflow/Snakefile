@@ -102,12 +102,8 @@ rule generate_workload:
               output[0],
               k = int(workload_config['k']),
               metric = workload_config["difficulty"],
-              target_low = float(workload_config['target_low']),
-              target_high = float(workload_config['target_high']),
+              target_class = workload_config['target_class'],
               num_queries = int(workload_config['num_queries']),
-              scale = float(workload_config['scale']),
-              initial_temperature = int(workload_config['initial_temperature']),
-              max_steps = 10000,
               threads = threads,
             )
         elif workload_type == "synthetic-gaussian-noise":
