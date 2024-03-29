@@ -20,9 +20,8 @@ class WorkloadPatterns:
         workload_type = config["workload_type"]
         if workload_type == "synthetic-simulated-annealing":
             metric = config["difficulty"]
-            low = config["target_low"]
-            high = config["target_high"]
-            return f"Annealing({metric}, {low:.2f}, {high:.2f})"
+            difficulty = config["target_class"]
+            return f"Annealing({metric}, {difficulty})"
         elif workload_type == "synthetic-gaussian-noise":
             scale = config["scale"]
             return f"GaussianNoise({scale})"
@@ -105,80 +104,43 @@ def _annealing_workloads():
     datasets = [
         "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
-        "glove-angular-104-1183514",
+        # "glove-angular-104-1183514",
         # "nytimes-angular-256-289761",
         # "sald-128-1000000",
     ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
-    faiss_ivf_difficulties = [(t - 0.01, t + 0.01) for t in [0.05, 0.2]]
-    target_difficulty = {
-        "faiss_ivf": {
-            "fashion_mnist-euclidean-784-60K": faiss_ivf_difficulties,
-            "glove-angular-104-1183514": faiss_ivf_difficulties,
-            "glove-angular-32-1183514": faiss_ivf_difficulties,
-            # "sald-128-1000000": faiss_ivf_difficulties,
-            "nytimes-angular-256-289761": faiss_ivf_difficulties,
-        },
-        "rc": {
-            "fashion_mnist-euclidean-784-60K": [(2.1, 1.9), (1.05, 1.03), (1.01, 1.0)],
-            "glove-angular-104-1183514": [(2.1, 1.9), (1.8, 1.7), (1.5, 1.3)],
-            "nytimes-angular-256-289761": [(2.1, 1.9)],
-            "sald-128-1000000": [(100, 1)],
-        },
-    }
-    scales = {
-        "fashion_mnist-euclidean-784-60K": [10],
-        "glove-angular-32-1183514": [0.1],
-        "glove-angular-104-1183514": [0.1],
-        "sald-128-1000000": [10],
-        "nytimes-angular-256-289761": [0.1],
-    }
-    initial_temperature = {
-        "fashion_mnist-euclidean-784-60K": [10],
-        "glove-angular-32-1183514": [1],
-        "glove-angular-104-1183514": [1],
-        "sald-128-1000000": [10],
-        "nytimes-angular-256-289761": [1],
-    }
-
+    target_difficulties = ["easy", "medium", "hard"]
+    target_difficulties = ["hard"]
+    target_metrics = ["rc"]
     num_queries = [10]
     k_values = [10]
 
-    for dataset, k, nq in product(datasets, k_values, num_queries):
-        for tf in target_difficulty.keys():
-            if dataset not in target_difficulty[tf]:
-                continue
-            for scale, temp, (lower, upper) in product(
-                scales[dataset],
-                initial_temperature[dataset],
-                target_difficulty[tf][dataset],
-            ):
-                conf = OrderedDict(  # to maintain a consistent hash value
-                    {
-                        "workload_type": workload_type,
-                        "dataset": dataset,
-                        "k": k,
-                        "num_queries": nq,
-                        "difficulty": tf,
-                        "target_low": lower,
-                        "target_high": upper,
-                        "scale": scale,
-                        "initial_temperature": temp,
-                    }
-                )
-                key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
-                workloads_dict[key] = conf
-                dname, _, features, distance_metric = rd.parse_filename(dataset)
-                workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
-                configs.append(
-                    {
-                        "dataset": dataset,
-                        "workload_key": key,
-                        "workload_file": workload_fname,
-                    }
-                )
+    for dataset, k, nq, target_difficulty, target_metric in product(
+        datasets, k_values, num_queries, target_difficulties, target_metrics
+    ):
+        conf = OrderedDict(  # to maintain a consistent hash value
+            {
+                "workload_type": workload_type,
+                "dataset": dataset,
+                "k": k,
+                "num_queries": nq,
+                "difficulty": target_metric,
+                "target_class": target_difficulty,
+            }
+        )
+        key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
+        workloads_dict[key] = conf
+        dname, _, features, distance_metric = rd.parse_filename(dataset)
+        workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
+        configs.append(
+            {
+                "dataset": dataset,
+                "workload_key": key,
+                "workload_file": workload_fname,
+            }
+        )
 
     return configs, workloads_dict
 
@@ -200,7 +162,6 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        # "glove-angular-32-1183514",
         "glove-angular-104-1183514",
         "nytimes-angular-256-289761",
         "sald-128-100m",
@@ -208,8 +169,9 @@ def _gaussian_noise_workloads():
         "deep1b-96-100m",
         "seismic-256-100m",
     ]
-    scales = [0.1, 1.0, 10.0]
-    num_queries = [30]
+    # scales = [0.1, 1.0, 10.0]
+    scales = ["easy", "medium", "hard"]
+    num_queries = [100]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
@@ -226,11 +188,13 @@ def _gaussian_noise_workloads():
             dname, _, features, distance_metric = rd.parse_filename(dataset)
             workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
             configs.append(
-                {
-                    "dataset": dataset,
-                    "workload_key": key,
-                    "workload_file": workload_fname,
-                }
+                OrderedDict(
+                    {
+                        "dataset": dataset,
+                        "workload_key": key,
+                        "workload_file": workload_fname,
+                    }
+                )
             )
 
     return configs, workloads_dict
@@ -245,17 +209,17 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    annealing_configs = _annealing_workloads()
-    configs.extend(annealing_configs[0])
-    workloads_dict.update(annealing_configs[1])
+    # annealing_configs = _annealing_workloads()
+    # configs.extend(annealing_configs[0])
+    # workloads_dict.update(annealing_configs[1])
 
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
     workloads_dict.update(noise_configs[1])
 
-    file_configs = _file_based_workloads()
-    configs.extend(file_configs[0])
-    workloads_dict.update(file_configs[1])
+    # file_configs = _file_based_workloads()
+    # configs.extend(file_configs[0])
+    # workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 

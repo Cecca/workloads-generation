@@ -49,6 +49,17 @@ def generate_workload_gaussian_noise(
 ):
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
+    if scale in ["easy", "medium", "hard"]:
+        index = faiss.IndexFlatL2(dataset.shape[1])
+        index.add(dataset)
+        diameter = _estimate_diameter(dataset, index, distance_metric)
+        logging.info("diameter is %f", diameter)
+        scale = {
+            "easy": diameter / 100000,
+            "medium": diameter / 10000,
+            "hard": diameter / 1000,
+        }[scale]
+        logging.info("scale is %f", scale)
 
     queries = generate_queries_gaussian_noise(
         dataset,
@@ -66,6 +77,12 @@ def generate_workload_gaussian_noise(
         raise ValueError(f"Unknown format `{queries_output}`")
 
 
+def _estimate_diameter(data, index, distance_metric):
+    q = data[0]
+    distances = utils.compute_distances(q, None, distance_metric, index)[0]
+    return distances[-1] * 2
+
+
 def generate_queries_annealing(
     dataset,
     distance_metric,
@@ -74,9 +91,9 @@ def generate_queries_annealing(
     target_low,
     target_high,
     num_queries,
-    scale,
-    max_steps=10000,
-    initial_temperature=10,
+    scale="auto",
+    max_steps=1000,
+    initial_temperature=1.0,
     seed=1234,
     threads=os.cpu_count(),
 ):
@@ -84,6 +101,14 @@ def generate_queries_annealing(
 
     index = faiss.IndexFlatL2(dataset.shape[1])
     index.add(dataset)
+
+    if scale == "auto":
+        if distance_metric == "angular":
+            scale = 0.1
+        else:
+            diameter = _estimate_diameter(dataset, index, distance_metric)
+            scale = diameter / 100
+        logging.info("using automatic scale: %f", scale)
 
     neighbor_generators = {
         "angular": neighbor_generator_angular(scale, gen),
@@ -104,12 +129,16 @@ def generate_queries_annealing(
 
     queries = []
 
-    while len(queries) < num_queries:
+    MAX_ROUNDS = 10
+    round = 0
+    while len(queries) < num_queries and round < MAX_ROUNDS:
+        round += 1
         nq = num_queries - len(queries)
         starting_ids = list(
             gen.choice(np.arange(dataset.shape[0]), size=nq, replace=False)
         )
-        print(
+        logging.debug("Starting from %s", starting_ids)
+        logging.info(
             f"Round to generate {nq} queries from {starting_ids} target ({target_low}, {target_high})"
         )
 
@@ -131,14 +160,14 @@ def generate_queries_annealing(
                 try:
                     query = future.result()
                 except Exception as exc:
-                    # FIXME: we should still add something, or fill the output with some
-                    # data, because returning fewer vectors breaks the naming convention.
                     logging.error(
                         "Error in generating query from %d: %s" % (tasks[future], exc)
                     )
                 else:
                     queries.append(query)
+        break
     queries = np.vstack(queries)
+    assert queries.shape[0] == num_queries
     return queries
 
 
@@ -204,7 +233,11 @@ def annealing(
         ):
             # the next candidate goes towards the desired range
             x, y = x_next, y_next
-            logging.debug("new best score %f", y)
+            logging.debug(
+                "new best score %f, (still %f to go)",
+                y,
+                min(abs(y_next - target_low), abs(y_next - target_high)),
+            )
             x_best, y_best = x, y
             steps_since_last_improvement = 0
         else:
@@ -222,6 +255,9 @@ def annealing(
                     p,
                     delta,
                 )
+            else:
+                # logging.debug("rejecting proposal (temperature %f, p %f)", t, p)
+                pass
             steps_since_last_improvement += 1
 
     raise Exception(
@@ -298,13 +334,18 @@ def faiss_ivf_scorer(
 
 
 def neighbor_generator_angular(scale, rng):
+    neigh_eucl = neighbor_generator_euclidean(scale, rng)
+
     def inner(x):
-        coord = rng.integers(x.shape)
-        offset = np.zeros_like(x)
-        offset[coord] = rng.normal(scale=scale)
-        # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
-        neighbor = x + offset
+        neighbor = neigh_eucl(x)
+        # coord = rng.integers(x.shape)
+        # offset = np.zeros_like(x)
+        # offset[coord] = rng.normal(scale=scale)
+        # # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
+        # neighbor = x + offset
         neighbor /= np.linalg.norm(neighbor)
+        d = 1.0 - np.dot(x, neighbor)
+        # logging.debug("angular distance: %f", d)
         return neighbor
 
     return inner
@@ -317,7 +358,7 @@ def neighbor_generator_euclidean(scale, rng):
         amount = rng.exponential(scale=scale)
         offset = direction * amount
         neighbor = x + offset
-        logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
+        # logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
         return neighbor
 
     return inner
@@ -648,22 +689,49 @@ def generate_workload(
     write_queries_hdf5(queries, queries_output)
 
 
+def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
+    index = faiss.IndexFlatL2(data.shape[1])
+    index.add(data)
+    gen = np.random.default_rng(seed)
+    indices = gen.integers(data.shape[0], size=sample_size)
+    qs = data[indices, :]
+    distances = utils.compute_distances(qs, None, distance_metric, index)
+    knn_dists = distances[:, k]
+    avg_dists = distances.mean(axis=1)
+    rcs = avg_dists / knn_dists
+    return rcs.mean()
+
+
 def generate_workload_annealing(
     dataset_input,
     queries_output,
     k,
     metric,
-    target_low,
-    target_high,
+    target_class,
     num_queries,
-    initial_temperature=1,
-    scale=10,
-    max_steps=300,
+    initial_temperature=1.0,
+    scale="auto",
+    max_steps=1000,
     seed=1234,
     threads=os.cpu_count(),
 ):
+    assert target_class in ["easy", "medium", "hard"]
+
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
+
+    if metric == "rc":
+        avg_rc = _average_rc(dataset, distance_metric, k)
+        target_rc = {
+            "easy": avg_rc,
+            "medium": (avg_rc - 1) / 10 + 1,
+            "hard": (avg_rc - 1) / 100 + 1,
+        }[target_class]
+        delta = 0.01 * target_rc
+        target_low = target_rc + delta
+        target_high = target_rc - delta
+    else:
+        raise NotImplemented("not yet implemented")
 
     queries = generate_queries_annealing(
         dataset,
