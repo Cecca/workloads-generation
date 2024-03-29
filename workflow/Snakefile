@@ -102,12 +102,8 @@ rule generate_workload:
               output[0],
               k = int(workload_config['k']),
               metric = workload_config["difficulty"],
-              target_low = float(workload_config['target_low']),
-              target_high = float(workload_config['target_high']),
+              target_class = workload_config['target_class'],
               num_queries = int(workload_config['num_queries']),
-              scale = float(workload_config['scale']),
-              initial_temperature = int(workload_config['initial_temperature']),
-              max_steps = 10000,
               threads = threads,
             )
         elif workload_type == "synthetic-gaussian-noise":
@@ -373,19 +369,28 @@ rule run_messi_shell:
 --with_id ")
 
         res = []
-        for q_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 8,11", read=True, iterable=True)):
-            dists, sax_dist = tuple(map(int, log_line.split()))
+        for line_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 6,8,11", read=True, iterable=True)):
+            q_idx, dists, sax_dist = list(map(int, log_line.split()))
             distcomp = dists + sax_rescale * sax_dist
             distcomp = distcomp / data_samples
+
+            alg_name = "messi"
+            recall = 1.0
+
+            if q_idx >= q_samples:
+                alg_name = "messi_apprx"
+                q_idx -= q_samples
+                recall = None
+
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
                 "query_index": q_idx,
-                "index_name": "messi",
+                "index_name": alg_name,
                 "index_params": "",
                 "time_s": None,
                 "distcomp": distcomp,
-                "recall": 1.0,
+                "recall": recall,
             })
         try:
             os.remove(output[0])
