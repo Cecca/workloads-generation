@@ -751,8 +751,8 @@ def generate_workload_annealing(
         avg_rc = _average_rc(dataset, distance_metric, k)
         if distance_metric == "angular":
             target_rc = {
-                "easy": (avg_rc - 1) / 2 + 1,
-                "medium": (avg_rc - 1) / 10 + 1,
+                "easy": (avg_rc - 1) / 10 + 1,
+                "medium": (avg_rc - 1) / 25 + 1,
                 "hard": (avg_rc - 1) / 50 + 1,
             }[target_class]
         else:
