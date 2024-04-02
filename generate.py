@@ -92,7 +92,7 @@ def generate_queries_annealing(
     target_high,
     num_queries,
     scale="auto",
-    max_steps=1000,
+    max_steps=2000,
     initial_temperature=1.0,
     seed=1234,
     threads=os.cpu_count(),
@@ -102,13 +102,16 @@ def generate_queries_annealing(
     index = faiss.IndexFlatL2(dataset.shape[1])
     index.add(dataset)
 
+    orig_scale = scale
     if scale == "auto":
         if distance_metric == "angular":
             scale = 0.1
         else:
             diameter = _estimate_diameter(dataset, index, distance_metric)
-            scale = diameter / 100
+            scale = diameter / 1000
         logging.info("using automatic scale: %f", scale)
+    else:
+        logging.info("using user-defined scale of %f", scale)
 
     neighbor_generators = {
         "angular": neighbor_generator_angular(scale, gen),
@@ -129,7 +132,7 @@ def generate_queries_annealing(
 
     queries = []
 
-    MAX_ROUNDS = 10
+    MAX_ROUNDS = 3
     round = 0
     while len(queries) < num_queries and round < MAX_ROUNDS:
         round += 1
@@ -165,7 +168,23 @@ def generate_queries_annealing(
                     )
                 else:
                     queries.append(query)
-        break
+        if len(queries) < nq / 2:
+            logging.info(
+                "not a single query generated after %d steps. Restarting", max_steps
+            )
+            if orig_scale == "auto":
+                if distance_metric == "angular":
+                    scale = 0.1
+                else:
+                    diameter = _estimate_diameter(dataset, index, distance_metric)
+                    scale *= 10
+                logging.info("restarting using automatic scale: %f", scale)
+                neighbor_generators = {
+                    "angular": neighbor_generator_angular(scale, gen),
+                    "euclidean": neighbor_generator_euclidean(scale, gen),
+                }
+                gen_neighbor = neighbor_generators[distance_metric]
+
     queries = np.vstack(queries)
     assert queries.shape[0] == num_queries
     return queries
@@ -259,6 +278,14 @@ def annealing(
                 # logging.debug("rejecting proposal (temperature %f, p %f)", t, p)
                 pass
             steps_since_last_improvement += 1
+        if step % 50 == 0:
+            logging.info(
+                "%d/%d current score %f, (still %f to target)",
+                step,
+                max_steps,
+                y,
+                min(abs(y - target_low), abs(y - target_high)),
+            )
 
     raise Exception(
         "Could not find point in the desired range, started from %s" % y_start
@@ -722,12 +749,19 @@ def generate_workload_annealing(
 
     if metric == "rc":
         avg_rc = _average_rc(dataset, distance_metric, k)
-        target_rc = {
-            "easy": avg_rc,
-            "medium": (avg_rc - 1) / 10 + 1,
-            "hard": (avg_rc - 1) / 100 + 1,
-        }[target_class]
-        delta = 0.01 * target_rc
+        if distance_metric == "angular":
+            target_rc = {
+                "easy": (avg_rc - 1) / 2 + 1,
+                "medium": (avg_rc - 1) / 10 + 1,
+                "hard": (avg_rc - 1) / 50 + 1,
+            }[target_class]
+        else:
+            target_rc = {
+                "easy": (avg_rc - 1) / 2 + 1,
+                "medium": (avg_rc - 1) / 10 + 1,
+                "hard": (avg_rc - 1) / 100 + 1,
+            }[target_class]
+        delta = 0.05 * target_rc
         target_low = target_rc + delta
         target_high = target_rc - delta
     else:

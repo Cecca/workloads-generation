@@ -105,14 +105,13 @@ def _annealing_workloads():
         "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
         # "glove-angular-104-1183514",
-        # "nytimes-angular-256-289761",
+        "nytimes-angular-256-289761",
         # "sald-128-1000000",
     ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
     target_difficulties = ["easy", "medium", "hard"]
-    target_difficulties = ["hard"]
     target_metrics = ["rc"]
     num_queries = [10]
     k_values = [10]
@@ -209,13 +208,13 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    # annealing_configs = _annealing_workloads()
-    # configs.extend(annealing_configs[0])
-    # workloads_dict.update(annealing_configs[1])
+    annealing_configs = _annealing_workloads()
+    configs.extend(annealing_configs[0])
+    workloads_dict.update(annealing_configs[1])
 
-    noise_configs = _gaussian_noise_workloads()
-    configs.extend(noise_configs[0])
-    workloads_dict.update(noise_configs[1])
+    # noise_configs = _gaussian_noise_workloads()
+    # configs.extend(noise_configs[0])
+    # workloads_dict.update(noise_configs[1])
 
     # file_configs = _file_based_workloads()
     # configs.extend(file_configs[0])
