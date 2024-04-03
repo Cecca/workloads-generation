@@ -105,6 +105,7 @@ rule generate_workload:
               target_class = workload_config['target_class'],
               num_queries = int(workload_config['num_queries']),
               threads = threads,
+              max_rounds = "return-any"
             )
         elif workload_type == "synthetic-gaussian-noise":
             print("generating with gaussian noise", workload_config)

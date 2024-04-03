@@ -4,9 +4,9 @@ This module collects approaches to generate workloads for a given dataset.
 
 import os
 import numpy as np
+import read_data
 import dimensionality_measures as dm
 from metrics import EmpiricalDifficultyIVF
-import read_data
 import faiss
 import utils
 import time
@@ -37,7 +37,7 @@ def generate_queries_gaussian_noise(
         np.isfinite(pts)
     ), f"Some values are infinite or NaN in the queries just generated with gaussian noise with scale {scale}"
 
-    return pts
+    return pts.astype(np.float32)
 
 
 def generate_workload_gaussian_noise(
@@ -71,6 +71,8 @@ def generate_workload_gaussian_noise(
 
     if queries_output.endswith(".bin"):
         queries.tofile(queries_output)
+        check, _ = read_data.read_multiformat(queries_output, "", repair=False)
+        assert np.all(np.isclose(check, queries))
     elif queries_output.endswith(".hdf5"):
         write_queries_hdf5(queries, queries_output)
     else:
@@ -96,6 +98,7 @@ def generate_queries_annealing(
     initial_temperature=1.0,
     seed=1234,
     threads=os.cpu_count(),
+    max_rounds=3,
 ):
     gen = np.random.default_rng(seed)
 
@@ -132,9 +135,11 @@ def generate_queries_annealing(
 
     queries = []
 
-    MAX_ROUNDS = 3
+    return_any = max_rounds == "return-any"
+    max_rounds = 1 if return_any else max_rounds
+
     round = 0
-    while len(queries) < num_queries and round < MAX_ROUNDS:
+    while len(queries) < num_queries and round < max_rounds:
         round += 1
         nq = num_queries - len(queries)
         starting_ids = list(
@@ -160,12 +165,14 @@ def generate_queries_annealing(
                 for x in starting_ids
             }
             for future in tasks:
-                try:
-                    query = future.result()
-                except Exception as exc:
-                    logging.error(
-                        "Error in generating query from %d: %s" % (tasks[future], exc)
-                    )
+                query, success = future.result()
+                if not success:
+                    logging.warning("Unable to generate query from %d", tasks[future])
+                    if return_any:
+                        logging.info("Appending anyway to result")
+                        assert np.linalg.norm(query) > 0
+                        assert np.all(np.isfinite(query))
+                        queries.append(query)
                 else:
                     queries.append(query)
         if len(queries) < nq / 2:
@@ -185,7 +192,7 @@ def generate_queries_annealing(
                 }
                 gen_neighbor = neighbor_generators[distance_metric]
 
-    queries = np.vstack(queries)
+    queries = np.vstack(queries).astype(np.float32)
     assert queries.shape[0] == num_queries
     return queries
 
@@ -222,7 +229,7 @@ def annealing(
     logging.info("start from score %f", y)
     if target_low <= y <= target_high:
         logging.info("point is already in the desired range")
-        return x
+        return x, True
 
     steps_since_last_improvement = 0
     steps_threshold = max(max_steps // 100, 10)
@@ -245,7 +252,7 @@ def annealing(
                 step,
                 time.time() - t_start,
             )
-            return x_next
+            return x_next, True
         # elif y <= y_next <= target_low or target_high <= y_next <= y:
         elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(
             abs(y - target_low), abs(y - target_high)
@@ -287,9 +294,7 @@ def annealing(
                 min(abs(y - target_low), abs(y - target_high)),
             )
 
-    raise Exception(
-        "Could not find point in the desired range, started from %s" % y_start
-    )
+    return x, False
 
 
 def fast_annealing_schedule(t1):
@@ -721,16 +726,19 @@ def generate_workload(
 
 
 def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
-    index = faiss.IndexFlatL2(data.shape[1])
-    index.add(data)
     gen = np.random.default_rng(seed)
     indices = gen.integers(data.shape[0], size=sample_size)
     qs = data[indices, :]
+    data = np.delete(data, indices, axis=0)
+    index = faiss.IndexFlatL2(data.shape[1])
+    index.add(data)
     distances = utils.compute_distances(qs, None, distance_metric, index)
     knn_dists = distances[:, k]
     avg_dists = distances.mean(axis=1)
     rcs = avg_dists / knn_dists
-    return rcs.mean()
+    avg_rc = rcs.mean()
+    print("Average relative contrast is", avg_rc)
+    return avg_rc
 
 
 def generate_workload_annealing(
@@ -742,9 +750,10 @@ def generate_workload_annealing(
     num_queries,
     initial_temperature=1.0,
     scale="auto",
-    max_steps=1000,
+    max_steps=2000,
     seed=1234,
     threads=os.cpu_count(),
+    max_rounds=3,
 ):
     assert target_class in ["easy", "medium", "hard"]
 
@@ -784,10 +793,14 @@ def generate_workload_annealing(
         initial_temperature,
         seed,
         threads,
+        max_rounds,
     )
 
     if queries_output.endswith(".bin"):
+        assert np.all(np.isfinite(queries))
         queries.tofile(queries_output)
+        check, _ = read_data.read_multiformat(queries_output, "", repair=False)
+        assert np.all(np.isclose(check, queries))
     elif queries_output.endswith(".hdf5"):
         write_queries_hdf5(queries, queries_output)
     else:

@@ -9,3 +9,4 @@ imgs
 .index-cache
 .joblib-cache
 messi/build
+scratch.py

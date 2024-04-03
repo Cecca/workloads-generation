@@ -102,7 +102,7 @@ def _annealing_workloads():
     workloads_dict = dict()
 
     datasets = [
-        "fashion_mnist-euclidean-784-60K",
+        # "fashion_mnist-euclidean-784-60K",
         # "glove-angular-32-1183514",
         # "glove-angular-104-1183514",
         "nytimes-angular-256-289761",

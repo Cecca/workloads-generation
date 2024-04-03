@@ -164,9 +164,6 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN, repair=True):
         print("Invalid file extension. Supported formats: .txt, .hdf5, .bin")
         sys.exit()
 
-    if distance_metric == "angular":
-        data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
-
     if repair:
         # replace NaN with
         mask = np.isnan(data)
@@ -175,7 +172,12 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN, repair=True):
             print("Replaced", nreplace, "NaNs")
         data[mask] = 0.0
 
-    assert np.all(np.isfinite(data)), f"Some values are infinite or NaN in file: {path}"
+    assert np.all(
+        np.isfinite(data)
+    ), f"Some values are infinite or NaN in file: {path}\n{data}"
+
+    if distance_metric == "angular":
+        data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
 
     print("Loaded", data.shape[0], "vectors in", data.shape[1], "dimensions")
 
