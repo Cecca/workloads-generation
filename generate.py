@@ -174,7 +174,7 @@ def generate_queries_annealing(
             )
             if orig_scale == "auto":
                 if distance_metric == "angular":
-                    scale = 0.1
+                    scale += 0.1
                 else:
                     diameter = _estimate_diameter(dataset, index, distance_metric)
                     scale *= 10
@@ -755,9 +755,9 @@ def generate_workload_annealing(
         avg_rc = _average_rc(dataset, distance_metric, k)
         if distance_metric == "angular":
             target_rc = {
-                "easy": (avg_rc - 1) / 10 + 1,
-                "medium": (avg_rc - 1) / 25 + 1,
-                "hard": (avg_rc - 1) / 50 + 1,
+                "easy": (avg_rc - 1) * 1.5 + 1,
+                "medium": (avg_rc - 1) * 1.0 + 1,
+                "hard": (avg_rc - 1) / 2 + 1,
             }[target_class]
         else:
             target_rc = {
