@@ -361,18 +361,22 @@ def faiss_ivf_scorer(
 
 
 def neighbor_generator_angular(scale, rng):
-    neigh_eucl = neighbor_generator_euclidean(scale, rng)
+    a = scale / (1 - scale)
+    b = 1
 
     def inner(x):
-        neighbor = neigh_eucl(x)
-        # coord = rng.integers(x.shape)
-        # offset = np.zeros_like(x)
-        # offset[coord] = rng.normal(scale=scale)
-        # # offset = rng.normal(scale=scale, size=x.shape[0]).astype(np.float32)
-        # neighbor = x + offset
+        # get orthogonal vector in a random direction
+        y = rng.normal(size=x.shape[0])
+        y[0] = (0.0 - np.sum(x[1:] * y[1:])) / x[0]
+        y /= np.linalg.norm(y)
+        # get a random value for the dot product
+        d = 1 - rng.beta(a, b)
+        # compute the neighbor position
+        neighbor = x + y * np.tan(np.arccos(d))
         neighbor /= np.linalg.norm(neighbor)
-        d = 1.0 - np.dot(x, neighbor)
-        # logging.debug("angular distance: %f", d)
+        # check that the dot product is what we expect
+        d_check = np.dot(x, neighbor)
+        assert np.isclose(d, d_check)
         return neighbor
 
     return inner
