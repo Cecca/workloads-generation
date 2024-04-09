@@ -219,13 +219,13 @@ def workloads():
     configs.extend(annealing_configs[0])
     workloads_dict.update(annealing_configs[1])
 
-    # noise_configs = _gaussian_noise_workloads()
-    # configs.extend(noise_configs[0])
-    # workloads_dict.update(noise_configs[1])
+    noise_configs = _gaussian_noise_workloads()
+    configs.extend(noise_configs[0])
+    workloads_dict.update(noise_configs[1])
 
-    # file_configs = _file_based_workloads()
-    # configs.extend(file_configs[0])
-    # workloads_dict.update(file_configs[1])
+    file_configs = _file_based_workloads()
+    configs.extend(file_configs[0])
+    workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 
