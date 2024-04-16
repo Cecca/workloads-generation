@@ -82,8 +82,11 @@ rule generate_workload:
     input:
         os.path.join(DATA_DIR, "{dataset}.bin")
     output:
-        os.path.join(GENERATED_DIR,
+        workload = os.path.join(GENERATED_DIR,
           f"{WORKLOADS.wildcard_pattern}.bin"
+        ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
         ),
     threads: workflow.cores
     run:
@@ -92,6 +95,8 @@ rule generate_workload:
         import logging
         import sys
         import os
+        import read_data
+        import utils
         logging.basicConfig(level=logging.INFO)
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
@@ -99,7 +104,7 @@ rule generate_workload:
         if workload_type == "synthetic-simulated-annealing":
             generate.generate_workload_annealing(
               input[0],
-              output[0],
+              output["workload"],
               k = int(workload_config['k']),
               metric = workload_config["difficulty"],
               target_class = workload_config['target_class'],
@@ -111,7 +116,7 @@ rule generate_workload:
             print("generating with gaussian noise", workload_config)
             generate.generate_workload_gaussian_noise(
                 input[0],
-                output[0],
+                output["workload"],
                 num_queries=workload_config["num_queries"],
                 scale=workload_config["scale"],
             )
@@ -121,10 +126,15 @@ rule generate_workload:
               os.path.abspath(
                 os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
               ),
-              output[0]
+              output["workload"]
             )
         else:
             raise ValueError(f"unknown workload type {workload_type}")
+
+        print("Saving the ground truth")
+        dataset, distance_metric = read_data.read_multiformat(input[0], "train")
+        queryset, _ = read_data.read_multiformat(output["workload"], "test")
+        utils.save_ground_truth(dataset, queryset, distance_metric, output["ground"])
 
 
 # And finally here we compute the metrics of the synthetic

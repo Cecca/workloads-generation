@@ -166,12 +166,12 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
     ]
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]
@@ -213,17 +213,17 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    annealing_configs = _annealing_workloads()
-    configs.extend(annealing_configs[0])
-    workloads_dict.update(annealing_configs[1])
+    # annealing_configs = _annealing_workloads()
+    # configs.extend(annealing_configs[0])
+    # workloads_dict.update(annealing_configs[1])
 
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
     workloads_dict.update(noise_configs[1])
 
-    file_configs = _file_based_workloads()
-    configs.extend(file_configs[0])
-    workloads_dict.update(file_configs[1])
+    # file_configs = _file_based_workloads()
+    # configs.extend(file_configs[0])
+    # workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 
