@@ -1,5 +1,3 @@
-import pandas as pd
-from snakemake.utils import Paramspace
 from itertools import product
 import pickle
 import hashlib

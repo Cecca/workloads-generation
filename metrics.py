@@ -10,6 +10,8 @@ import read_data as rd
 from threading import Lock
 from cache import MEM
 from utils import *
+import indices
+from indices import FAISS_LOCK
 
 
 def compute_epsilon_hardness(distances, epsilon, k=1):
@@ -118,19 +120,6 @@ def partition_by(candidates, fun):
     return cur_res
 
 
-@MEM.cache
-def _build_faiss_ivf_index(dataset, n_list):
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    return index
-
-
-# This lock protects the accesses to faiss global performance counters
-FAISS_LOCK = Lock()
-
-
 class EmpiricalDifficultyIVF(object):
     """
     Stores (and possibly caches on a file) a FAISS-IVF index to evaluate the difficulty
@@ -139,8 +128,7 @@ class EmpiricalDifficultyIVF(object):
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
         self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
-
-        self.index = _build_faiss_ivf_index(dataset, self.n_list)
+        self.index = indices.build_faiss_ivf(dataset, self.n_list)
         self.exact_index = exact_index
         self.recall = recall
         self.distance_metric = distance_metric

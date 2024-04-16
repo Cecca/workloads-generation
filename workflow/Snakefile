@@ -138,6 +138,7 @@ rule eval_metrics:
           ),
     output:
         os.path.join(RES_DIR, f"metrics/{WORKLOADS.wildcard_pattern}.csv"),
+    threads: workflow.cores
     run:
         import workflow.parameters as wparams
         import metrics
@@ -328,7 +329,7 @@ rule run_messi_shell:
           RES_DIR, 
           f"metrics/messi/{WORKLOADS.wildcard_pattern}/results.csv"
         ),
-    threads: workflow.cores / 2
+    threads: workflow.cores
     log:
          os.path.join(RES_DIR,f"logs/messi/{WORKLOADS.wildcard_pattern}.log")
     run:
@@ -414,6 +415,7 @@ rule run_faiss_hnsw:
           RES_DIR, 
           f"metrics/faiss_hnsw/{WORKLOADS.wildcard_pattern}/results.csv"
         ),
+    threads: workflow.cores
     run:
         import read_data
         import faiss
@@ -421,7 +423,8 @@ rule run_faiss_hnsw:
         import time
         import pandas as pd
         import json
-        from metrics import FAISS_LOCK
+        import indices
+        from indices import FAISS_LOCK
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -429,9 +432,7 @@ rule run_faiss_hnsw:
         queryset, _ = read_data.read_multiformat(input["workload"], "test")
         print("Populating index")
         index_params = "HNSW32"
-        index = faiss.index_factory(dataset.shape[1], index_params)
-        index.add(dataset)
-        index.train(dataset)
+        index = indices.build_faiss_hnsw(dataset, index_params)
         print("done")
         target_recall = 0.95
 
@@ -485,6 +486,7 @@ rule run_faiss_ivf:
           RES_DIR, 
           f"metrics/faiss_ivf/{WORKLOADS.wildcard_pattern}/results.csv"
         ),
+    threads: workflow.cores
     run:
         import numpy as np
         import read_data
@@ -493,7 +495,8 @@ rule run_faiss_ivf:
         import time
         import pandas as pd
         import json
-        from metrics import FAISS_LOCK
+        import indices
+        from indices import FAISS_LOCK
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -502,9 +505,7 @@ rule run_faiss_ivf:
         print("Populating index")
         n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
         index_params = f"IVF{n_list},Flat"
-        index = faiss.index_factory(dataset.shape[1], index_params)
-        index.train(dataset)
-        index.add(dataset)
+        index = indices.build_faiss_ivf(dataset, n_list)
         print("done")
         target_recall = 0.95
 
