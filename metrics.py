@@ -8,6 +8,7 @@ import faiss
 import time
 import read_data as rd
 from threading import Lock
+from cache import MEM
 from utils import *
 
 
@@ -82,39 +83,11 @@ def get_epsilons(queries, dataset, distance_metric, threads=None):
         max_e = dist[-1] / dist[0] - 1
         max_e_arr.append(max_e)
 
-    # def compute_query(i):
-    #     dist = compute_distances(queries[i], None, distance_metric, dataset)[0]
-    #     max_e = dist[-1] / dist[0] - 1
-    #     return max_e
-
-    # if threads is None:
-    #     import os
-
-    #     threads = os.cpu_count()
-    # with ThreadPoolExecutor(threads) as pool:
-    #     tasks = [pool.submit(compute_query, i) for i in range(sample)]
-    #     max_e_arr = []
-    #     for task in tqdm(as_completed(tasks), total=len(tasks)):
-    #         max_e = task.result()
-    #         max_e_arr.append(max_e)
-
     mean_max_e = sum(max_e_arr) / len(max_e_arr)
     print(f"mean_max_epsilon: {mean_max_e}")
 
     quantiles = [0.25, 0.5, 0.75]
     return [mean_max_e * r for r in quantiles], quantiles
-
-
-def build_index(dataset, n_list, distance_metric):
-    print("Building index")
-
-    quantizer = faiss.IndexFlatL2(dataset.shape[1])
-    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-    index.train(dataset)
-    index.add(dataset)
-    print("Index built")
-
-    return index
 
 
 def partition_by(candidates, fun):
@@ -145,27 +118,13 @@ def partition_by(candidates, fun):
     return cur_res
 
 
+@MEM.cache
 def _build_faiss_ivf_index(dataset, n_list):
-    import logging
-    import hashlib
-    import os
-
-    sha = hashlib.new("sha256")
-    sha.update(dataset.tobytes())
-    sha = sha.hexdigest()
-    fname = f".index-cache/faiss-ivf-{n_list}-{sha}.bin"
-
-    if not os.path.isfile(fname):
-        if not os.path.isdir(".index-cache"):
-            os.mkdir(".index-cache")
-        logging.info("Computing index")
-        quantizer = faiss.IndexFlatL2(dataset.shape[1])
-        index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
-        index.train(dataset)
-        index.add(dataset)
-        faiss.write_index(index, faiss.FileIOWriter(fname))
-
-    return faiss.read_index(faiss.FileIOReader(fname))
+    quantizer = faiss.IndexFlatL2(dataset.shape[1])
+    index = faiss.IndexIVFFlat(quantizer, dataset.shape[1], n_list, faiss.METRIC_L2)
+    index.train(dataset)
+    index.add(dataset)
+    return index
 
 
 # This lock protects the accesses to faiss global performance counters
@@ -219,13 +178,7 @@ class EmpiricalDifficultyIVF(object):
 
         start = time.time()
         dist_frac = partition_by(list(range(1, self.n_list)), tester)
-        elapsed_dist_frac = time.time() - start
-        # print(
-        #     "Time for brute force",
-        #     elapsed_bf,
-        #     "time for finding the distances",
-        #     elapsed_dist_frac,
-        # )
+
         if dist_frac is not None:
             return dist_frac
         else:
@@ -270,7 +223,6 @@ def metrics_csv(
         the output csv file"""
         query = queries[i, :].astype(np.float32)
         q_distances = compute_distances(query, None, distance_metric, exact_index)[0]
-        # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k)
         lid = compute_lid(q_distances, k, "linear")
         rc = compute_rc(q_distances, k, "linear")
         expansion = compute_expansion(q_distances, k, "linear")
@@ -306,149 +258,4 @@ def metrics_csv(
         writer.writerow(header)
 
         for row in rows:
-            writer.writerow(row)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", required=True, help="Path to the dataset file")
-    parser.add_argument("--query", required=True, help="Path to the query file")
-    parser.add_argument(
-        "--k", type=int, required=True, help="Number of nearest neighbors to find"
-    )
-    parser.add_argument(
-        "--epsilon", type=float, nargs="+", help="List of epsilon values to use"
-    )
-    parser.add_argument(
-        "--data_limit",
-        type=int,
-        help="Maximum number of data points to load from the dataset file",
-    )
-    parser.add_argument(
-        "--query_limit",
-        type=int,
-        help="Maximum number of query points to load from the query file",
-    )
-    parser.add_argument(
-        "--sample",
-        type=float,
-        default=0.05,
-        help="Fraction of query set used to calculate epsilons",
-    )
-
-    args = parser.parse_args()
-
-    # Extract the named parameters
-    dataset_name = args.dataset
-    queryset_name = args.query
-    k_value = args.k
-    epsilon = args.epsilon
-    data_limit = args.data_limit
-    query_limit = args.query_limit
-    sample = args.sample
-
-    # Check if the required parameters are present
-    if dataset_name is None or queryset_name is None or k_value is None:
-        print(
-            "Usage: python metrics.py dataset_file query_file k [optional:epsilon as list with spaces] [optional:data_limit] [optional:query_limit]"
-        )
-        sys.exit(1)
-
-    dataset, distance_metric = rd.read_multiformat(dataset_name, "train", data_limit)
-    queries, _ = rd.read_multiformat(queryset_name, "test", query_limit)
-    print(
-        "Loaded dataset with {} points, and queryset with {} queries".format(
-            dataset.shape, queries.shape
-        )
-    )
-
-    # epsilons = None
-    #
-    # if epsilon is not None:
-    #     epsilons = [float(x) for x in opt_params]
-    # else:
-    #     epsilons = get_epsilons(queries[:int(sample*len(queries))+1], dataset, distance_metric)
-    #
-    # print(epsilons)
-    # epsilons_str = '_'.join(f'{e:.2f}' for e in epsilons)
-    # print (f'e-values (based on {sample} query sample): {epsilons_str}')
-
-    epsilons = None
-
-    if epsilon is not None:
-        epsilons = [float(x) for x in opt_params]
-    else:
-        epsilons, eps_quantiles = get_epsilons(
-            queries[: int(sample * len(queries)) + 1], dataset, distance_metric
-        )
-
-    epsilons_str = "_".join(f"{e:.2f}" for e in epsilons)
-    print(f"e-values (based on {sample} query sample): {epsilons_str}")
-
-    # output_file = f"res_{dataset_name}_{queryset_name}_{k_value}"
-    output_file = f"res_{dataset_name}_{queryset_name}_{k_value}_{epsilons_str}"
-
-    target_recall = 0.95
-    n_list = 32
-    index = build_index(dataset, n_list, distance_metric)
-
-    flag = True
-    with open(output_file + ".csv", "w", newline="") as fp:
-        writer = csv.writer(fp)
-
-        header = [
-            "i",
-            "lid_" + str(k_value),
-            "rc_" + str(k_value),
-            f"exp_{2*k_value}|{k_value}",
-        ]
-        header.extend(["eps_" + f"{e:.2f}" for e in epsilons])
-        header.extend(["distcomp", "rec", "elapsed"])
-        writer.writerow(header)
-
-        nqueries = queries.shape[0]
-        for i in tqdm(range(nqueries)):
-            query = queries[i, :].astype(np.float32)
-            # q_distances = compute_distances(query, None, distance_metric, dataset)[0]
-            # lid, rc, expansion, epsilons_hard = compute_metrics(q_distances, epsilons, k_value)
-            # lid = compute_lid(q_distances, k_value, "linear")
-            # rc = compute_rc(q_distances, k_value, "linear")
-            # expansion = compute_expansion(q_distances, k_value, "linear")
-
-            q_distances = compute_distances(query, None, distance_metric, dataset)
-            lid, rc, expansion, epsilons_hard = compute_metrics(
-                q_distances, epsilons, k_value
-            )
-
-            row = [i, lid, rc, expansion]
-            row.extend(epsilons_hard)
-
-            # qq = np.array([query]) # just to comply with faiss API
-            distcomp = None
-            elapsed = None
-            for nprobe in range(1, 1000):
-                faiss.cvar.indexIVF_stats.reset()
-                index.nprobe = nprobe
-                tstart = time.time()
-                # run_dists = compute_distances(query, k_value, distance_metric, index)[0]
-                run_dists = compute_distances(query, k_value, distance_metric, index)
-                tend = time.time()
-                elapsed = tend - tstart
-                q_dists = q_distances[:k_value]
-                # debug
-                if flag:
-                    print(f"run_dist: {run_dists} \n q_dist {q_dists}")
-                    flag = False
-
-                rec = compute_recall(q_dists, run_dists, k_value)
-                if rec >= target_recall:
-                    distcomp = (
-                        faiss.cvar.indexIVF_stats.ndis
-                        + +faiss.cvar.indexIVF_stats.nq * n_list
-                    )
-                    break
-
-            assert distcomp is not None
-            row.extend([distcomp, rec, elapsed])
-
             writer.writerow(row)
