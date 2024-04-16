@@ -80,3 +80,38 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
         if d <= t:
             actual += 1
     return float(actual) / float(count)
+
+
+def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
+    """Compute the `maxk` nearest neighbors of the given queries on the given dataset.
+    Saves a npz file containing the distances, the average
+    distances for each query at the given query path."""
+    import faiss
+
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+
+    # We batch the computation in groups of BATCH_SIZE queries to leverage index parallelism.
+    # We don't run all the queries at once because all the results would require too much memory.
+    BATCH_SIZE = 1000
+    distances = []
+    averages = []
+    for batch_start in range(0, queries.shape[0], BATCH_SIZE):
+        batch_end = batch_start + BATCH_SIZE
+        batch = queries[batch_start:batch_end]
+        batch_dists = compute_distances(batch, None, distance_metric, index)
+        batch_avgs = np.mean(batch_dists, axis=1)
+        assert batch_dists.shape[0] == batch.shape[0]
+        assert batch_avgs.shape[0] == batch.shape[0]
+        distances.append(batch_dists[:, :maxk])
+        averages.append(batch_avgs)
+
+    distances = np.concatenate(distances)
+    averages = np.concatenate(averages)
+    assert distances.shape == (
+        queries.shape[0],
+        maxk,
+    ), f"distances.shape = {distances.shape}, expected {(queries.shape[0], maxk)}"
+    assert averages.shape == (queries.shape[0],)
+
+    np.savez(path, distances=distances, average_distances=averages)
