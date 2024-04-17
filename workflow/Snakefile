@@ -383,7 +383,8 @@ rule run_messi_shell:
         res = []
         for line_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 6,8,11", read=True, iterable=True)):
             q_idx, dists, sax_dist = list(map(int, log_line.split()))
-            distcomp = dists + sax_rescale * sax_dist
+            # distcomp = dists + sax_rescale * sax_dist
+            distcomp = dists
             distcomp = distcomp / data_samples
 
             alg_name = "messi"
