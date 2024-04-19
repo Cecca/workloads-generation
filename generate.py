@@ -2,16 +2,21 @@
 This module collects approaches to generate workloads for a given dataset.
 """
 
+from icecream import ic
 import os
 import numpy as np
 import read_data
 import dimensionality_measures as dm
+import metrics
 from metrics import EmpiricalDifficultyIVF
 import faiss
 import utils
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import jax
+import jax.numpy as jnp
+import optax
 
 
 def generate_queries_gaussian_noise(
@@ -487,3 +492,151 @@ def write_queries_hdf5(queries, path):
 
     with h5py.File(path, "w") as hfp:
         hfp["test"] = queries
+
+
+@jax.jit
+def _euclidean(x, dataset):
+    return jnp.linalg.norm(dataset - x, axis=1)
+
+
+@jax.jit
+def _angular(x, dataset):
+    return 1 - jnp.dot(dataset, x)
+
+
+def _rc(x, dataset, distance_fn, k):
+    dists = distance_fn(x, dataset)
+    dists = jnp.sort(dists)
+    return jnp.mean(dists) / dists[k]
+
+
+def build_relative_contrast_loss(k, distance_fn, target_low, target_high):
+    def inner(x, dataset):
+        rc = _rc(x, dataset, distance_fn, k)
+        if target_low <= rc <= target_high:
+            return 0.0
+        return min(abs(rc - target_low), abs(rc - target_high))
+
+    return inner
+
+
+def generate_query_sgd(
+    dataset,
+    distance_metric,
+    k,
+    target_low,
+    target_high,
+    learning_rate=1.0,
+    max_iter=1000,
+    seed=1234,
+):
+    assert target_low <= target_high
+    if distance_metric == "euclidean":
+        distance_fn = _euclidean
+    elif distance_metric == "angular":
+        distance_fn = _angular
+    else:
+        raise ValueError(f"unknown distance metric {distance_metric}")
+
+    relative_contrast_loss = build_relative_contrast_loss(
+        k, distance_fn, target_low, target_high
+    )
+    grad_fn = jax.value_and_grad(relative_contrast_loss)
+
+    rng = np.random.default_rng(seed)
+    optimizer = optax.adam(learning_rate)
+    x = rng.normal(size=dataset.shape[1])
+    if distance_metric == "angular":
+        x /= jnp.linalg.norm(x)
+    opt_state = optimizer.init(x)
+
+    for i in range(max_iter):
+        # value, grads = grad_fn(x, dataset, k, target_low, target_high)
+        value, grads = grad_fn(x, dataset)
+        if value == 0.0:
+            break
+        logging.debug(
+            "[%d] still %.4f to the target range (%.4f, %.4f)",
+            i,
+            value,
+            target_low,
+            target_high,
+        )
+        if distance_metric == "angular":
+            # project the gradients on the tangent plane
+            grads = grads - jnp.dot(grads, x) * x
+            grads /= jnp.linalg.norm(grads)
+
+        updates, opt_state = optimizer.update(grads, opt_state)
+        x = optax.apply_updates(x, updates)
+        if distance_metric == "angular":
+            x /= jnp.linalg.norm(x)
+
+    return x
+
+
+def generate_workload_sgd(
+    dataset_input,
+    queries_output,
+    k,
+    target_class,
+    num_queries,
+    learning_rate=1.0,
+    max_steps=1000,
+    seed=1234,
+    threads=os.cpu_count(),
+):
+    assert target_class in ["easy", "medium", "hard"]
+
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    print("loaded dataset with shape", dataset.shape)
+
+    avg_rc = _average_rc(dataset, distance_metric, k)
+    if distance_metric == "angular":
+        target_rc = {
+            "easy": (avg_rc - 1) * 1.5 + 1,
+            "medium": (avg_rc - 1) * 1.0 + 1,
+            "hard": (avg_rc - 1) / 2 + 1,
+        }[target_class]
+    else:
+        target_rc = {
+            "easy": (avg_rc - 1) / 2 + 1,
+            "medium": (avg_rc - 1) / 10 + 1,
+            "hard": (avg_rc - 1) / 100 + 1,
+        }[target_class]
+    delta = 0.05 * target_rc
+    target_low = target_rc - delta
+    target_high = target_rc + delta
+
+    queries = []
+
+    with ThreadPoolExecutor(threads) as pool:
+        tasks = {
+            pool.submit(
+                generate_query_sgd,
+                dataset,
+                distance_metric,
+                k,
+                target_low,
+                target_high,
+                learning_rate=learning_rate,
+                max_iter=max_steps,
+                seed=seed,
+            ): seed
+            for seed in [seed + s for s in range(num_queries)]
+        }
+        for future in tasks:
+            query = future.result()
+            queries.append(query)
+
+    queries = np.vstack(queries).astype(np.float32)
+
+    if queries_output.endswith(".bin"):
+        assert np.all(np.isfinite(queries))
+        queries.tofile(queries_output)
+        check, _ = read_data.read_multiformat(queries_output, "", repair=False)
+        assert np.all(np.isclose(check, queries))
+    elif queries_output.endswith(".hdf5"):
+        write_queries_hdf5(queries, queries_output)
+    else:
+        raise ValueError(f"Unknown format `{queries_output}`")

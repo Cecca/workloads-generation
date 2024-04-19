@@ -1,3 +1,4 @@
+name: workloads-generation
 channels:
   - conda-forge
   - bioconda
@@ -10,5 +11,8 @@ dependencies:
   - tqdm
   - requests
   - seaborn
+  - jax
+  - optax
+  - joblib
   # indices
   - faiss-cpu
