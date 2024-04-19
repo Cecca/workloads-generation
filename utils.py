@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 
 DATASETS = {
@@ -82,6 +83,9 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
     return float(actual) / float(count)
 
 
+HISTOGRAM_BINS = 1000
+
+
 def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     """Compute the `maxk` nearest neighbors of the given queries on the given dataset.
     Saves a npz file containing the distances, the average
@@ -96,6 +100,8 @@ def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     BATCH_SIZE = 1000
     distances = []
     averages = []
+    histograms_counts = []
+    histograms_edges = []
     for batch_start in range(0, queries.shape[0], BATCH_SIZE):
         batch_end = batch_start + BATCH_SIZE
         batch = queries[batch_start:batch_end]
@@ -105,6 +111,10 @@ def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
         assert batch_avgs.shape[0] == batch.shape[0]
         distances.append(batch_dists[:, :maxk])
         averages.append(batch_avgs)
+        for row in batch_dists:
+            counts, edges = np.histogram(row, bins=HISTOGRAM_BINS)
+            histograms_counts.append(counts)
+            histograms_edges.append(edges)
 
     distances = np.concatenate(distances)
     averages = np.concatenate(averages)
@@ -114,4 +124,16 @@ def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     ), f"distances.shape = {distances.shape}, expected {(queries.shape[0], maxk)}"
     assert averages.shape == (queries.shape[0],)
 
-    np.savez(path, distances=distances, average_distances=averages)
+    np.savez(
+        path,
+        distances=distances,
+        average_distances=averages,
+        histograms_counts=histograms_counts,
+        histograms_edges=histograms_edges,
+    )
+
+
+def count_within_distance(histogram_counts, histogram_edges, threshold):
+    """Count how many points are within distance `threshold` using the given histogram counts and edges"""
+    pos = np.searchsorted(histogram_edges, threshold)
+    return np.sum(histogram_counts[: pos + 1])

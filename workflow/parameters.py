@@ -62,7 +62,7 @@ def _file_based_workloads():
         ("sald-128-100m", "sald-128-1k"),
         # TODO: add synthetic ?
         ("rw-256-100m", "rw-256-1k"),
-	("astro-256-100m", "astro-256-1k"),
+        ("astro-256-100m", "astro-256-1k"),
         ("deep1b-96-100m", "deep1b-96-1k"),
         ("seismic-256-100m", "seismic-256-1k"),
     ]
@@ -113,7 +113,7 @@ def _annealing_workloads():
         "astro-256-100m",
         "deep1b-96-100m",
         "seismic-256-100m",
-	"rw-256-100m",
+        "rw-256-100m",
     ]
 
     # Simulated annealing synthetic queries
@@ -168,13 +168,13 @@ def _gaussian_noise_workloads():
 
     datasets = [
         "fashion_mnist-euclidean-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
-	"rw-256-100m",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
+        # "rw-256-100m",
     ]
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]

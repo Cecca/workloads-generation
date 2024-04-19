@@ -10,3 +10,4 @@ imgs
 .joblib-cache
 messi/build
 scratch.py
+.vscode
