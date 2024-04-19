@@ -421,6 +421,9 @@ rule run_faiss_hnsw:
           os.path.join(GENERATED_DIR,
             f"{WORKLOADS.wildcard_pattern}.bin"
           ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
+        ),
     output:
         os.path.join(
           RES_DIR, 
@@ -428,6 +431,7 @@ rule run_faiss_hnsw:
         ),
     threads: workflow.cores
     run:
+        import numpy as np
         import read_data
         import faiss
         import utils
@@ -441,6 +445,8 @@ rule run_faiss_hnsw:
         k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
         queryset, _ = read_data.read_multiformat(input["workload"], "test")
+        ground_truth = np.load(input.ground)["distances"]
+
         print("Populating index")
         index_params = "HNSW32"
         index = indices.build_faiss_hnsw(dataset, index_params)
@@ -452,7 +458,8 @@ rule run_faiss_hnsw:
         for q_idx in range(queryset.shape[0]):
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
-            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            ground_distances = ground_truth[q_idx, :] 
+            print("loaded", ground_distances)
             index.hnsw.efSearch = 1
             rec = 0
             n_dist_comp = 0
@@ -492,6 +499,9 @@ rule run_faiss_ivf:
           os.path.join(GENERATED_DIR,
             f"{WORKLOADS.wildcard_pattern}.bin"
           ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
+        ),
     output:
         os.path.join(
           RES_DIR, 
@@ -513,6 +523,8 @@ rule run_faiss_ivf:
         k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
         queryset, _ = read_data.read_multiformat(input["workload"], "test")
+        ground_truth = np.load(input.ground)["distances"]
+
         print("Populating index")
         n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
         index_params = f"IVF{n_list},Flat"
@@ -525,7 +537,7 @@ rule run_faiss_ivf:
         for q_idx in range(queryset.shape[0]):
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
-            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            ground_distances = ground_truth[q_idx,:] # utils.compute_distances(q, None, distance_metric, dataset)[0, :]
             index.nprobe = 1
             rec = 0
             n_dist_comp = 0

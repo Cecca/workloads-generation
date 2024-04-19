@@ -178,7 +178,7 @@ def _gaussian_noise_workloads():
     ]
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]
-    num_queries = [100]
+    num_queries = [1000]
     k_values = [10]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):

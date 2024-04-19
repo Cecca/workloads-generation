@@ -1,5 +1,4 @@
 import numpy as np
-import itertools
 
 
 DATASETS = {
@@ -28,7 +27,8 @@ def compute_distances(queries, k, metric, data_or_index):
     single_query_input = len(queries.shape) == 1
     if single_query_input:
         # We were given just a single query
-        queries = np.array([queries])
+        queries = queries.reshape(1, -1)
+        # queries = np.array([queries])
 
     if metric == "angular":
         assert np.all(
@@ -90,10 +90,7 @@ def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     """Compute the `maxk` nearest neighbors of the given queries on the given dataset.
     Saves a npz file containing the distances, the average
     distances for each query at the given query path."""
-    import faiss
-
-    index = faiss.IndexFlatL2(dataset.shape[1])
-    index.add(dataset)
+    assert len(queries.shape) == 2
 
     # We batch the computation in groups of BATCH_SIZE queries to leverage index parallelism.
     # We don't run all the queries at once because all the results would require too much memory.
@@ -105,7 +102,7 @@ def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     for batch_start in range(0, queries.shape[0], BATCH_SIZE):
         batch_end = batch_start + BATCH_SIZE
         batch = queries[batch_start:batch_end]
-        batch_dists = compute_distances(batch, None, distance_metric, index)
+        batch_dists = compute_distances(batch, None, distance_metric, dataset)
         batch_avgs = np.mean(batch_dists, axis=1)
         assert batch_dists.shape[0] == batch.shape[0]
         assert batch_avgs.shape[0] == batch.shape[0]
