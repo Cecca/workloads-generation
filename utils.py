@@ -1,4 +1,5 @@
 import numpy as np
+from icecream import ic
 
 
 DATASETS = {
@@ -24,11 +25,12 @@ def compute_distances(queries, k, metric, data_or_index):
 
     If `k` is None, then all distances are returned
     """
+    import scipy.spatial
+
     single_query_input = len(queries.shape) == 1
     if single_query_input:
         # We were given just a single query
         queries = queries.reshape(1, -1)
-        # queries = np.array([queries])
 
     if metric == "angular":
         assert np.all(
@@ -41,16 +43,14 @@ def compute_distances(queries, k, metric, data_or_index):
             assert np.allclose(
                 1.0, np.linalg.norm(dataset, axis=1)
             ), "Data points should have unit norm"
-            dists = np.array([1 - np.dot(dataset, query) for query in queries])
+            dists = 1 - np.dot(queries, dataset.T)
         elif metric == "euclidean":
-            dists = np.array(
-                [np.linalg.norm(query - dataset, axis=1) for query in queries]
-            )
+            dists = scipy.spatial.distance.cdist(queries, dataset)
         else:
             raise RuntimeError("unknown distance" + metric)
         if k is not None:
             dists.partition(k, axis=1)
-            dists = dists[:, :k]  # np.partition(dists, k)[:k]
+            dists = dists[:, :k]
         dists[dists < 0] = 0
         assert np.all(dists >= 0), f"not all distances are positive: {dists[dists < 0]}"
         return np.sort(dists)
