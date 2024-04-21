@@ -107,7 +107,7 @@ rule generate_workload:
               threads = threads,
               max_rounds = "return-any"
             )
-        if workload_type == "synthetic-sgd":
+        elif workload_type == "synthetic-sgd":
             generate.generate_workload_sgd(
               input[0],
               output[0],
