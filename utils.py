@@ -1,4 +1,5 @@
 import numpy as np
+from icecream import ic
 
 
 DATASETS = {
@@ -24,10 +25,12 @@ def compute_distances(queries, k, metric, data_or_index):
 
     If `k` is None, then all distances are returned
     """
+    import scipy.spatial
+
     single_query_input = len(queries.shape) == 1
     if single_query_input:
         # We were given just a single query
-        queries = np.array([queries])
+        queries = queries.reshape(1, -1)
 
     if metric == "angular":
         assert np.all(
@@ -40,16 +43,14 @@ def compute_distances(queries, k, metric, data_or_index):
             assert np.allclose(
                 1.0, np.linalg.norm(dataset, axis=1)
             ), "Data points should have unit norm"
-            dists = np.array([1 - np.dot(dataset, query) for query in queries])
+            dists = 1 - np.dot(queries, dataset.T)
         elif metric == "euclidean":
-            dists = np.array(
-                [np.linalg.norm(query - dataset, axis=1) for query in queries]
-            )
+            dists = scipy.spatial.distance.cdist(queries, dataset)
         else:
             raise RuntimeError("unknown distance" + metric)
         if k is not None:
             dists.partition(k, axis=1)
-            dists = dists[:, :k]  # np.partition(dists, k)[:k]
+            dists = dists[:, :k]
         dists[dists < 0] = 0
         assert np.all(dists >= 0), f"not all distances are positive: {dists[dists < 0]}"
         return np.sort(dists)
@@ -80,3 +81,56 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
         if d <= t:
             actual += 1
     return float(actual) / float(count)
+
+
+HISTOGRAM_BINS = 1000
+
+
+def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
+    """Compute the `maxk` nearest neighbors of the given queries on the given dataset.
+    Saves a npz file containing the distances, the average
+    distances for each query at the given query path."""
+    assert len(queries.shape) == 2
+
+    # We batch the computation in groups of BATCH_SIZE queries to leverage index parallelism.
+    # We don't run all the queries at once because all the results would require too much memory.
+    BATCH_SIZE = 1000
+    distances = []
+    averages = []
+    histograms_counts = []
+    histograms_edges = []
+    for batch_start in range(0, queries.shape[0], BATCH_SIZE):
+        batch_end = batch_start + BATCH_SIZE
+        batch = queries[batch_start:batch_end]
+        batch_dists = compute_distances(batch, None, distance_metric, dataset)
+        batch_avgs = np.mean(batch_dists, axis=1)
+        assert batch_dists.shape[0] == batch.shape[0]
+        assert batch_avgs.shape[0] == batch.shape[0]
+        distances.append(batch_dists[:, :maxk])
+        averages.append(batch_avgs)
+        for row in batch_dists:
+            counts, edges = np.histogram(row, bins=HISTOGRAM_BINS)
+            histograms_counts.append(counts)
+            histograms_edges.append(edges)
+
+    distances = np.concatenate(distances)
+    averages = np.concatenate(averages)
+    assert distances.shape == (
+        queries.shape[0],
+        maxk,
+    ), f"distances.shape = {distances.shape}, expected {(queries.shape[0], maxk)}"
+    assert averages.shape == (queries.shape[0],)
+
+    np.savez(
+        path,
+        distances=distances,
+        average_distances=averages,
+        histograms_counts=histograms_counts,
+        histograms_edges=histograms_edges,
+    )
+
+
+def count_within_distance(histogram_counts, histogram_edges, threshold):
+    """Count how many points are within distance `threshold` using the given histogram counts and edges"""
+    pos = np.searchsorted(histogram_edges, threshold)
+    return np.sum(histogram_counts[: pos + 1])

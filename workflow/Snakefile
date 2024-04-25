@@ -82,8 +82,11 @@ rule generate_workload:
     input:
         os.path.join(DATA_DIR, "{dataset}.bin")
     output:
-        os.path.join(GENERATED_DIR,
+        workload = os.path.join(GENERATED_DIR,
           f"{WORKLOADS.wildcard_pattern}.bin"
+        ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
         ),
     threads: workflow.cores
     run:
@@ -92,6 +95,8 @@ rule generate_workload:
         import logging
         import sys
         import os
+        import read_data
+        import utils
         logging.basicConfig(level=logging.INFO)
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
@@ -99,7 +104,7 @@ rule generate_workload:
         if workload_type == "synthetic-simulated-annealing":
             generate.generate_workload_annealing(
               input[0],
-              output[0],
+              output["workload"],
               k = int(workload_config['k']),
               metric = workload_config["difficulty"],
               target_class = workload_config['target_class'],
@@ -111,7 +116,7 @@ rule generate_workload:
             print("generating with gaussian noise", workload_config)
             generate.generate_workload_gaussian_noise(
                 input[0],
-                output[0],
+                output["workload"],
                 num_queries=workload_config["num_queries"],
                 scale=workload_config["scale"],
             )
@@ -121,10 +126,15 @@ rule generate_workload:
               os.path.abspath(
                 os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
               ),
-              output[0]
+              output["workload"]
             )
         else:
             raise ValueError(f"unknown workload type {workload_type}")
+
+        print("Saving the ground truth")
+        dataset, distance_metric = read_data.read_multiformat(input[0], "train")
+        queryset, _ = read_data.read_multiformat(output["workload"], "test")
+        utils.save_ground_truth(dataset, queryset, distance_metric, output["ground"])
 
 
 # And finally here we compute the metrics of the synthetic
@@ -411,6 +421,9 @@ rule run_faiss_hnsw:
           os.path.join(GENERATED_DIR,
             f"{WORKLOADS.wildcard_pattern}.bin"
           ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
+        ),
     output:
         os.path.join(
           RES_DIR, 
@@ -418,6 +431,7 @@ rule run_faiss_hnsw:
         ),
     threads: workflow.cores
     run:
+        import numpy as np
         import read_data
         import faiss
         import utils
@@ -431,6 +445,8 @@ rule run_faiss_hnsw:
         k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
         queryset, _ = read_data.read_multiformat(input["workload"], "test")
+        ground_truth = np.load(input.ground)["distances"]
+
         print("Populating index")
         index_params = "HNSW32"
         index = indices.build_faiss_hnsw(dataset, index_params)
@@ -442,7 +458,8 @@ rule run_faiss_hnsw:
         for q_idx in range(queryset.shape[0]):
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
-            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            ground_distances = ground_truth[q_idx, :] 
+            print("loaded", ground_distances)
             index.hnsw.efSearch = 1
             rec = 0
             n_dist_comp = 0
@@ -482,6 +499,9 @@ rule run_faiss_ivf:
           os.path.join(GENERATED_DIR,
             f"{WORKLOADS.wildcard_pattern}.bin"
           ),
+        ground = os.path.join(GENERATED_DIR,
+          f"{WORKLOADS.wildcard_pattern}/ground.npz"
+        ),
     output:
         os.path.join(
           RES_DIR, 
@@ -503,6 +523,8 @@ rule run_faiss_ivf:
         k = workload_config["k"]
         dataset, distance_metric = read_data.read_multiformat(input["data"], "train")
         queryset, _ = read_data.read_multiformat(input["workload"], "test")
+        ground_truth = np.load(input.ground)["distances"]
+
         print("Populating index")
         n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
         index_params = f"IVF{n_list},Flat"
@@ -515,7 +537,7 @@ rule run_faiss_ivf:
         for q_idx in range(queryset.shape[0]):
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
-            ground_distances = utils.compute_distances(q, None, distance_metric, dataset)[0, :]
+            ground_distances = ground_truth[q_idx,:] # utils.compute_distances(q, None, distance_metric, dataset)[0, :]
             index.nprobe = 1
             rec = 0
             n_dist_comp = 0
