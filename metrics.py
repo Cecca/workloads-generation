@@ -199,10 +199,11 @@ def metrics_csv(
         exact_index=exact_index,
     )
 
-    epsilons, eps_quantiles = get_epsilons(
-        queries[: int(sample * len(queries)) + 1], exact_index, distance_metric
-    )
-    # epsilons = [.5, 1, 1.5] # temp to test
+    # epsilons, eps_quantiles = get_epsilons(
+    #     queries[: int(sample * len(queries)) + 1], exact_index, distance_metric
+    # )
+
+    epsilons = [.05, .1, .5, 1] # fixed epsilons 
     epsilons_str = "_".join(f"{e:.2f}" for e in epsilons)
     print(f"e-values (based on {sample} query sample): {epsilons_str}")
 
@@ -242,7 +243,8 @@ def metrics_csv(
 
         header.extend(["distcomp"])
         header.extend(additional_header)
-        header.extend([f"eps_q{e}" for e in eps_quantiles])
+        # header.extend([f"eps_q{e}" for e in eps_quantiles])
+        header.extend([f"eps_{e}" for e in epsilons])
         writer.writerow(header)
 
         for row in rows:
