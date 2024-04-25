@@ -95,9 +95,13 @@ rule generate_workload:
         import logging
         import sys
         import os
+<<<<<<< HEAD
         import read_data
         import utils
         logging.basicConfig(level=logging.INFO)
+=======
+        logging.basicConfig(level=logging.DEBUG)
+>>>>>>> origin/stochastic-gradient-descent
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         workload_type = workload_config["workload_type"]
@@ -111,6 +115,15 @@ rule generate_workload:
               num_queries = int(workload_config['num_queries']),
               threads = threads,
               max_rounds = "return-any"
+            )
+        elif workload_type == "synthetic-sgd":
+            generate.generate_workload_sgd(
+              input[0],
+              output[0],
+              k = int(workload_config['k']),
+              target_class = workload_config['target_class'],
+              num_queries = int(workload_config['num_queries']),
+              threads = threads,
             )
         elif workload_type == "synthetic-gaussian-noise":
             print("generating with gaussian noise", workload_config)

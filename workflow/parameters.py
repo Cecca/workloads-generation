@@ -20,6 +20,10 @@ class WorkloadPatterns:
             metric = config["difficulty"]
             difficulty = config["target_class"]
             return f"Annealing({metric}, {difficulty})"
+        elif workload_type == "synthetic-sgd":
+            metric = config["difficulty"]
+            difficulty = config["target_class"]
+            return f"SGD({metric}, {difficulty})"
         elif workload_type == "synthetic-gaussian-noise":
             scale = config["scale"]
             return f"GaussianNoise({scale})"
@@ -81,6 +85,66 @@ def _file_based_workloads():
                 "dataset": dataset,
                 "workload_key": key,
                 "workload_file": queryset,
+            }
+        )
+
+    return configs, workloads_dict
+
+
+def _sgd_workloads():
+    import sys
+    import os
+
+    # Make the read_data module visible by adding its directory to
+    # the search path.
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+    import read_data as rd
+
+    configs = []
+    workloads_dict = dict()
+
+    datasets = [
+        "fashion_mnist-euclidean-784-60K",
+        "glove-angular-104-1183514",
+        "nytimes-angular-256-289761",
+        "sald-128-100m",
+        "astro-256-100m",
+        "deep1b-96-100m",
+        "seismic-256-100m",
+        "rw-256-100m",
+    ]
+
+    # Stochastic gradient descent
+    workload_type = "synthetic-sgd"
+    target_difficulties = ["easy", "medium", "hard"]
+    target_metrics = ["rc"]
+    num_queries = [10]
+    k_values = [10]
+
+    for dataset, k, nq, target_difficulty, target_metric in product(
+        datasets, k_values, num_queries, target_difficulties, target_metrics
+    ):
+        assert target_metric == "rc", "only RC is supported"
+        conf = OrderedDict(  # to maintain a consistent hash value
+            {
+                "workload_type": workload_type,
+                "dataset": dataset,
+                "k": k,
+                "num_queries": nq,
+                "difficulty": target_metric,
+                "target_class": target_difficulty,
+            }
+        )
+        key = hashlib.sha256(pickle.dumps(conf)).hexdigest()
+        workloads_dict[key] = conf
+        dname, _, features, distance_metric = rd.parse_filename(dataset)
+        workload_fname = f"{dname}-{distance_metric}-{features}-{nq}.bin"
+        configs.append(
+            {
+                "dataset": dataset,
+                "workload_key": key,
+                "workload_file": workload_fname,
             }
         )
 
@@ -216,9 +280,13 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    annealing_configs = _annealing_workloads()
-    configs.extend(annealing_configs[0])
-    workloads_dict.update(annealing_configs[1])
+    sgd_configs = _annealing_workloads()
+    configs.extend(sgd_configs[0])
+    workloads_dict.update(sgd_configs[1])
+
+    sgd_configs = _sgd_workloads()
+    configs.extend(sgd_configs[0])
+    workloads_dict.update(sgd_configs[1])
 
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
