@@ -95,13 +95,10 @@ rule generate_workload:
         import logging
         import sys
         import os
-<<<<<<< HEAD
         import read_data
         import utils
-        logging.basicConfig(level=logging.INFO)
-=======
+        #logging.basicConfig(level=logging.INFO)
         logging.basicConfig(level=logging.DEBUG)
->>>>>>> origin/stochastic-gradient-descent
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         workload_type = workload_config["workload_type"]
@@ -623,7 +620,7 @@ rule correlation_analysis:
         correlations["distcomp_correlation"] = np.abs(correlations["distcomp_correlation"])
 
         df = metrics.reset_index().melt(
-            value_vars=["lid_10", "rc_10", "exp_20|10", "eps_q0.25"], 
+            value_vars=["lid_10", "rc_10", "exp_20|10", "eps_0.1"], 
             id_vars=["distcomp", "dataset"]
         )
         
