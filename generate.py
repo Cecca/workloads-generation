@@ -597,12 +597,14 @@ def generate_workload_sgd(
             "easy": (avg_rc - 1) * 1.5 + 1,
             "medium": (avg_rc - 1) * 1.0 + 1,
             "hard": (avg_rc - 1) / 2 + 1,
+            "hard+": (avg_rc - 1) / 4 + 1
         }[target_class]
     else:
         target_rc = {
             "easy": (avg_rc - 1) / 2 + 1,
             "medium": (avg_rc - 1) / 10 + 1,
             "hard": (avg_rc - 1) / 100 + 1,
+            "hard+": (avg_rc - 1) / 500 + 1
         }[target_class]
     delta = 0.05 * target_rc
     target_low = target_rc - delta

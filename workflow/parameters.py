@@ -117,7 +117,7 @@ def _sgd_workloads():
 
     # Stochastic gradient descent
     workload_type = "synthetic-sgd"
-    target_difficulties = ["easy", "medium", "hard"]
+    target_difficulties = ["easy", "medium", "hard", "hard+"]
     target_metrics = ["rc"]
     num_queries = [10]
     k_values = [10]
