@@ -586,7 +586,7 @@ def generate_workload_sgd(
     seed=1234,
     threads=os.cpu_count(),
 ):
-    assert target_class in ["easy", "medium", "hard"]
+    assert target_class in ["easy", "medium", "hard", "hard+"]
 
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
