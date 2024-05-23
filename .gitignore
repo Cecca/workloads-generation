@@ -11,3 +11,5 @@ imgs
 messi/build
 scratch.py
 .vscode
+.direnv
+.venv

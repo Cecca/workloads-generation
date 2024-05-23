@@ -63,6 +63,113 @@ WORKLOADS= workloads()
 
 configfile: "workflow/config.yaml"
 
+######################################################################
+#
+# Paper content
+#
+######################################################################
+
+# Produce things that will go in the paper, starting from the 
+# results_nefeli directory
+rule paper_all:
+    input:
+        "paper/index-table.tex",
+        "paper/actual_relative_contrasts.png",
+        "paper/actual_lid.png"
+
+
+rule paper_index_table:
+    input:
+        "results_nefeli/index-performance.csv"
+    output:
+        "paper/index-table.tex"
+    run:
+        import pandas as pd
+        perf = pd.read_csv(input[0])
+        perf.rename(columns={"index_name": "index"}, inplace=True)
+        perf.replace("File.*", "File", regex=True, inplace=True)
+        perf.replace("faiss_ivf", "FaissIVF", regex=True, inplace=True)
+        perf.replace("faiss_hnsw", "FaissHNSW", regex=True, inplace=True)
+        perf.replace("fashion_mnist", "fashion-mnist", regex=True, inplace=True)
+        perf.replace({"dataset": "-.*"}, "", regex=True, inplace=True)
+        perf["method"] = perf["workload"].str.replace("\\(.*", "", regex=True)
+        perf["difficulty"] = perf["workload"].str.extract(r"(easy|medium|hard\+|hard)")
+        perf["difficulty"].fillna("-", inplace=True)
+
+        perf["difficulty"] = pd.Categorical(
+            perf["difficulty"],
+            categories=["-", "easy", "medium", "hard", "hard+"],
+            ordered=True
+        )
+        perf["method"] = pd.Categorical(
+            perf["method"],
+            categories=["File", "GaussianNoise", "Annealing", "SGD"],
+            ordered=True
+        )
+
+        perf = perf[perf["index"] != "messi_apprx"]
+        tab = perf.groupby(["index", "dataset", "method", "difficulty"])[["distcomp"]].mean()
+        tab = tab.dropna(axis=0)
+        tab = tab.reset_index(["method", "difficulty"]).pivot(columns=["method", "difficulty"], values="distcomp")
+        tab.to_latex(output[0], float_format="%.3f")
+
+
+rule paper_actual_relative_contrasts:
+    input:
+        "results_nefeli/all-metrics.csv"
+    output:
+        "paper/actual_relative_contrasts.png",
+        "paper/actual_lid.png"
+    run:
+        import pandas as pd
+        import seaborn.objects as so
+        metrics = pd.read_csv(input[0])
+        metrics = metrics[metrics["rc_10"] < 100]
+        metrics.replace("fashion_mnist", "fashion-mnist", regex=True, inplace=True)
+        metrics.replace({"dataset": "-.*"}, "", regex=True, inplace=True)
+        metrics["method"] = metrics["workload_description"].str.replace("\\(.*", "", regex=True)
+        metrics["difficulty"] = metrics["workload_description"].str.extract(r"(easy|medium|hard\+|hard)")
+        metrics["difficulty"].fillna("-", inplace=True)
+        metrics["difficulty"] = pd.Categorical(
+            metrics["difficulty"],
+            categories=["-", "easy", "medium", "hard", "hard+"],
+            ordered=True
+        )
+        metrics = metrics[metrics["method"] != "File"]
+        metrics["method"] = pd.Categorical(
+            metrics["method"],
+            categories=["GaussianNoise", "Annealing", "SGD"],
+            ordered=True
+        )
+
+        p = (
+          so.Plot(metrics,
+                  x="rc_10",
+                  y="method",
+                  color="difficulty")
+            .layout(size=(14, 7))
+            .facet("dataset", wrap=4)
+            .share(x=False)
+            .add(so.Dot(), so.Dodge())
+            .label(color="Difficulty")
+            .save(output[0])
+        )
+        p = (
+          so.Plot(metrics,
+                  x="lid_10",
+                  y="method",
+                  color="difficulty")
+            .layout(size=(8, 16))
+            .facet("dataset", wrap=2)
+            .share(x=False)
+            .add(so.Dot(), so.Dodge())
+            .label(color="Difficulty")
+            .save(output[1])
+        )
+
+        
+
+
 rule all:
     input:
         os.path.join(RES_DIR, "plots", "all-metrics.png"),
