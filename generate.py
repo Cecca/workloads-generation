@@ -529,6 +529,7 @@ def generate_query_sgd(
     learning_rate=1.0,
     max_iter=1000,
     seed=1234,
+    return_progress=False,
 ):
     assert target_low <= target_high
     if distance_metric == "euclidean":
@@ -537,6 +538,9 @@ def generate_query_sgd(
         distance_fn = _angular
     else:
         raise ValueError(f"unknown distance metric {distance_metric}")
+
+    t_start = time.time()
+    progress = []
 
     relative_contrast_loss = build_relative_contrast_loss(
         k, distance_fn, target_low, target_high
@@ -553,6 +557,15 @@ def generate_query_sgd(
     for i in range(max_iter):
         # value, grads = grad_fn(x, dataset, k, target_low, target_high)
         value, grads = grad_fn(x, dataset)
+        if return_progress:
+            rc = _rc(x, dataset, distance_fn, k)
+            progress.append(
+                {
+                    "iteration": i,
+                    "rc": rc,
+                    "elapsed_s": time.time() - t_start
+                }
+            )
         if value == 0.0:
             break
         logging.debug(
@@ -572,7 +585,10 @@ def generate_query_sgd(
         if distance_metric == "angular":
             x /= jnp.linalg.norm(x)
 
-    return x
+    if return_progress:
+        return x, progress
+    else:
+        return x
 
 
 def generate_workload_sgd(
@@ -597,14 +613,14 @@ def generate_workload_sgd(
             "easy": (avg_rc - 1) * 1.5 + 1,
             "medium": (avg_rc - 1) * 1.0 + 1,
             "hard": (avg_rc - 1) / 2 + 1,
-            "hard+": (avg_rc - 1) / 4 + 1
+            "hard+": (avg_rc - 1) / 4 + 1,
         }[target_class]
     else:
         target_rc = {
             "easy": (avg_rc - 1) / 2 + 1,
             "medium": (avg_rc - 1) / 10 + 1,
             "hard": (avg_rc - 1) / 100 + 1,
-            "hard+": (avg_rc - 1) / 500 + 1
+            "hard+": (avg_rc - 1) / 500 + 1,
         }[target_class]
     delta = 0.05 * target_rc
     target_low = target_rc - delta
@@ -642,3 +658,62 @@ def generate_workload_sgd(
         write_queries_hdf5(queries, queries_output)
     else:
         raise ValueError(f"Unknown format `{queries_output}`")
+
+
+def sgd_measure_convergence(
+    dataset_input,
+    output,
+    k,
+    num_queries,
+    learning_rate=1.0,
+    max_steps=2000,
+    seed=1234,
+):
+    """Keeps track of the convergence of SGD as well as the running time."""
+    import pandas as pd
+    import json
+
+    results = []
+
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    for q_idx in range(num_queries):
+        # we set the target to 0.0 (which is unattainable for the relative contrast) 
+        # so that we just do all the repetitions
+        _, progress = generate_query_sgd(
+            dataset,
+            distance_metric,
+            k,
+            0.0,
+            0.0,
+            learning_rate,
+            max_steps,
+            seed + q_idx,
+            return_progress=True,
+        )
+        progress = pd.DataFrame(progress)
+        progress["query_index"] = q_idx
+        results.append(progress)
+
+    res = pd.concat(results)
+    res["dataset"] = dataset_input
+    res["method"] = "sgd"
+    res["method_params"] = json.dumps({
+        "learning_rate": learning_rate,
+        "max_steps": max_steps,
+        "seed": seed
+    }, sort_keys=True)
+
+    res.to_csv(output)
+
+
+if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+
+    sgd_measure_convergence(
+        ".data/fashion-mnist-784-euclidean.hdf5",
+        "/tmp/convergence.csv",
+        k=10,
+        num_queries=10,
+        max_steps=100
+    )
