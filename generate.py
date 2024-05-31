@@ -116,7 +116,7 @@ def generate_queries_annealing(
             scale = 0.1
         else:
             diameter = _estimate_diameter(dataset, index, distance_metric)
-            scale = diameter / 1000
+            scale = diameter / 100
         logging.info("using automatic scale: %f", scale)
     else:
         logging.info("using user-defined scale of %f", scale)
@@ -566,7 +566,7 @@ def generate_query_sgd(
 
     rng = np.random.default_rng(seed)
     optimizer = optax.adam(learning_rate)
-    x = rng.normal(size=dataset.shape[1])
+    x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
     if distance_metric == "angular":
         x /= jnp.linalg.norm(x)
     opt_state = optimizer.init(x)
@@ -708,7 +708,7 @@ def annealing_measure_convergence(
         scale = 0.1
     else:
         diameter = _estimate_diameter(dataset, index, distance_metric)
-        scale = diameter / 1000
+        scale = diameter / 100
     logging.info("using automatic scale: %f", scale)
 
     neighbor_generators = {
@@ -756,6 +756,7 @@ def annealing_measure_convergence(
     res.to_csv(output, index=False)
 
 
+# TODO: should SGD start from a point in the dataset?
 def sgd_measure_convergence(
     dataset_input,
     output,
