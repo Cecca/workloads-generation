@@ -111,7 +111,7 @@ rule paper_index_table:
         tab = perf.groupby(["index", "dataset", "method", "difficulty"])[["distcomp"]].mean()
         tab = tab.dropna(axis=0)
         tab = tab.reset_index(["method", "difficulty"]).pivot(columns=["method", "difficulty"], values="distcomp")
-        tab.to_latex(output[0], float_format="%.3f")
+        tab.to_latex(output[0], float_format="%.5f")
 
 
 rule paper_actual_relative_contrasts:
