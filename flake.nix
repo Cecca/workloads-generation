@@ -35,6 +35,7 @@
             jinja2
             jupyter-console
             radian
+            faiss
           ]) ++
           (with pkgs.rPackages; [
             tidyverse

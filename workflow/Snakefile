@@ -367,6 +367,61 @@ rule plot_distcomps:
         #    .save(output[0])
         #)
 
+
+rule sgd_convergence_plot:
+    input:
+        os.path.join(RES_DIR, "convergence", "all.csv")
+    output:
+        os.path.join(RES_DIR, "convergence", "all.png")
+    run:
+        import pandas as pd
+        import seaborn.objects as so
+
+        df = pd.read_csv(input[0])
+        print(df.columns)
+        (
+          so.Plot(df, x="elapsed_s", y="rc", color="method", group="query_index")
+            .layout(size=(14, 7))
+            .add(so.Line())
+            .facet("dataset")
+            .save(output[0])
+        )
+
+
+rule sgd_convergence:
+    input:
+        expand(os.path.join(RES_DIR, "convergence", "sgd", "{dataset}.csv"), 
+               dataset=["fashion_mnist-euclidean-784-60K"])
+    output:
+        os.path.join(RES_DIR, "convergence", "all.csv")
+    run:
+        import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input))
+        df.to_csv(output[0], index=False)
+        
+
+
+rule sgd_convergence_one:
+    input:
+        os.path.join(DATA_DIR, "{dataset}.bin")
+    output:
+        os.path.join(RES_DIR, "convergence", "sgd", "{dataset}.csv")
+    run:
+        import generate
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+        generate.sgd_measure_convergence(
+            input[0],
+            output[0],
+            k=10,
+            num_queries=1,
+            max_steps=100
+        )
+        
+
+
 ######################################################################
 #
 # Indices

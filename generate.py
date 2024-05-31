@@ -210,6 +210,7 @@ def annealing(
     target_high,
     temperature,
     max_steps=100,
+    return_progress=False
 ):
     """
     Parameters
@@ -240,12 +241,22 @@ def annealing(
     steps_threshold = max(max_steps // 100, 10)
     logging.debug("steps threshold %d", steps_threshold)
 
+    progress = []
+
     t_start = time.time()
     for step in range(max_steps):
         if steps_since_last_improvement >= steps_threshold:
             logging.debug("moving back to the previous best due to lack of improvement")
             x, y = x_best, y_best
             steps_since_last_improvement = 0
+
+        if return_progress:
+            rc = np.exp(-y)
+            progress.append({
+                "iteration": step,
+                "rc": rc,
+                "elapsed_s": time.time() - t_start
+            })
 
         x_next = gen_neighbor(x)
         y_next = score(x_next)
@@ -257,7 +268,10 @@ def annealing(
                 step,
                 time.time() - t_start,
             )
-            return x_next, True
+            if return_progress:
+                return x_next, True, progress
+            else:
+                return x_next, True
         # elif y <= y_next <= target_low or target_high <= y_next <= y:
         elif min(abs(y_next - target_low), abs(y_next - target_high)) <= min(
             abs(y - target_low), abs(y - target_high)
@@ -299,7 +313,10 @@ def annealing(
                 min(abs(y - target_low), abs(y - target_high)),
             )
 
-    return x, False
+    if return_progress:
+        return x, False, progress
+    else:
+        return x, False
 
 
 def fast_annealing_schedule(t1):
@@ -555,7 +572,9 @@ def generate_query_sgd(
     opt_state = optimizer.init(x)
 
     for i in range(max_iter):
-        # value, grads = grad_fn(x, dataset, k, target_low, target_high)
+        # TODO: make the loss directly the  relative contrast. Then if the RC is below the desired
+        # range we use the negative of the gradient, otherwise we use it as is.
+        # This allows to avoid computing the relative contrast twice when reporting the contrast
         value, grads = grad_fn(x, dataset)
         if return_progress:
             rc = _rc(x, dataset, distance_fn, k)
@@ -660,6 +679,83 @@ def generate_workload_sgd(
         raise ValueError(f"Unknown format `{queries_output}`")
 
 
+def annealing_measure_convergence(
+    dataset_input,
+    output,
+    k,
+    num_queries,
+    initial_temperature=1.0,
+    max_steps=2000,
+    seed=1234,
+):
+    """Keeps track of the convergence of SGD as well as the running time."""
+    import pandas as pd
+    import json
+
+    gen = np.random.default_rng(1234)
+
+    results = []
+
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+
+    index = faiss.IndexFlatL2(dataset.shape[1])
+    index.add(dataset)
+
+    metric = "rc"
+
+    # set auto scale
+    if distance_metric == "angular":
+        scale = 0.1
+    else:
+        diameter = _estimate_diameter(dataset, index, distance_metric)
+        scale = diameter / 1000
+    logging.info("using automatic scale: %f", scale)
+
+    neighbor_generators = {
+        "angular": neighbor_generator_angular(scale, gen),
+        "euclidean": neighbor_generator_euclidean(scale, gen),
+    }
+    gen_neighbor = neighbor_generators[distance_metric]
+
+    scoring_functions = {
+        "rc": relative_contrast_scorer(index, distance_metric, k),
+        "faiss_ivf": faiss_ivf_scorer(index, dataset, distance_metric, k),
+    }
+    score = scoring_functions[metric]
+
+    score_transforms = {"rc": transform_rc, "faiss_ivf": lambda s: s}
+    score_transform = score_transforms[metric]
+
+    target = 0.0
+
+    for q_idx in range(num_queries):
+        x = dataset[q_idx]
+        _, _, progress = annealing(
+            score,
+            x,
+            gen_neighbor,
+            target,
+            target,
+            fast_annealing_schedule(initial_temperature),
+            max_steps=max_steps,
+            return_progress=True,
+        )
+        progress = pd.DataFrame(progress)
+        progress["query_index"] = q_idx
+        results.append(progress)
+
+    res = pd.concat(results)
+    res["dataset"] = dataset_input
+    res["method"] = "annealing"
+    res["method_params"] = json.dumps({
+        "initial_temperature": initial_temperature,
+        "max_steps": max_steps,
+        "seed": seed
+    }, sort_keys=True)
+
+    res.to_csv(output, index=False)
+
+
 def sgd_measure_convergence(
     dataset_input,
     output,
@@ -676,15 +772,17 @@ def sgd_measure_convergence(
     results = []
 
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    # we set the target to 0.0 (which is unattainable for the relative contrast) 
+    # so that we just do all the repetitions
+    target = 0.0
+
     for q_idx in range(num_queries):
-        # we set the target to 0.0 (which is unattainable for the relative contrast) 
-        # so that we just do all the repetitions
         _, progress = generate_query_sgd(
             dataset,
             distance_metric,
             k,
-            0.0,
-            0.0,
+            target,
+            target,
             learning_rate,
             max_steps,
             seed + q_idx,
@@ -703,17 +801,17 @@ def sgd_measure_convergence(
         "seed": seed
     }, sort_keys=True)
 
-    res.to_csv(output)
+    res.to_csv(output, index=False)
 
 
 if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    sgd_measure_convergence(
+    annealing_measure_convergence(
         ".data/fashion-mnist-784-euclidean.hdf5",
         "/tmp/convergence.csv",
         k=10,
-        num_queries=10,
+        num_queries=1,
         max_steps=100
     )
