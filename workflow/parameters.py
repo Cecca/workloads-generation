@@ -70,7 +70,7 @@ def _file_based_workloads():
         ("deep1b-96-100m", "deep1b-96-1k"),
         ("seismic-256-100m", "seismic-256-1k"),
     ]
-    k_values = [10]
+    k_values = [10, 1]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
         conf = {
             "workload_type": workload_type,
@@ -120,7 +120,7 @@ def _sgd_workloads():
     target_difficulties = ["easy", "medium", "hard", "hard+"]
     target_metrics = ["rc"]
     num_queries = [10]
-    k_values = [10]
+    k_values = [10, 1]
 
     for dataset, k, nq, target_difficulty, target_metric in product(
         datasets, k_values, num_queries, target_difficulties, target_metrics
@@ -185,7 +185,7 @@ def _annealing_workloads():
     target_difficulties = ["easy", "medium", "hard"]
     target_metrics = ["rc"]
     num_queries = [10]
-    k_values = [10]
+    k_values = [10, 1]
 
     for dataset, k, nq, target_difficulty, target_metric in product(
         datasets, k_values, num_queries, target_difficulties, target_metrics
@@ -243,7 +243,7 @@ def _gaussian_noise_workloads():
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]
     num_queries = [100]
-    k_values = [10]
+    k_values = [10, 1]
 
     for dataset, k, nq in product(datasets, k_values, num_queries):
         for scale in scales:

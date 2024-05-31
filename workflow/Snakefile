@@ -368,7 +368,7 @@ rule plot_distcomps:
         #)
 
 
-rule sgd_convergence_plot:
+rule convergence_plot:
     input:
         os.path.join(RES_DIR, "convergence", "all.csv")
     output:
@@ -388,9 +388,11 @@ rule sgd_convergence_plot:
         )
 
 
-rule sgd_convergence:
+rule convergence:
     input:
-        expand(os.path.join(RES_DIR, "convergence", "sgd", "{dataset}.csv"), 
+        expand(os.path.join(RES_DIR, "convergence", "{method}", "{dataset}.csv"), 
+               method=["sgd", "annealing"],
+               #method=[ "sgd"],
                dataset=["fashion_mnist-euclidean-784-60K"])
     output:
         os.path.join(RES_DIR, "convergence", "all.csv")
@@ -398,27 +400,37 @@ rule sgd_convergence:
         import pandas as pd
         df = pd.concat((pd.read_csv(f) for f in input))
         df.to_csv(output[0], index=False)
-        
 
 
-rule sgd_convergence_one:
+rule convergence_one:
     input:
         os.path.join(DATA_DIR, "{dataset}.bin")
     output:
-        os.path.join(RES_DIR, "convergence", "sgd", "{dataset}.csv")
+        os.path.join(RES_DIR, "convergence", "{method}", "{dataset}.csv")
     run:
         import generate
         import logging
 
         logging.basicConfig(level=logging.DEBUG)
 
-        generate.sgd_measure_convergence(
-            input[0],
-            output[0],
-            k=10,
-            num_queries=1,
-            max_steps=100
-        )
+        if wildcards["method"] == "sgd":
+            generate.sgd_measure_convergence(
+                input[0],
+                output[0],
+                k=10,
+                num_queries=1,
+                learning_rate=10,
+                max_steps=101
+            )
+        else:
+            generate.annealing_measure_convergence(
+                input[0],
+                output[0],
+                k=10,
+                num_queries=1,
+                max_steps=1001
+            )
+
         
 
 
