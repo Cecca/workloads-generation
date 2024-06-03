@@ -422,7 +422,7 @@ def neighbor_generator_euclidean(scale, rng):
     return inner
 
 
-def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
+def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
     gen = np.random.default_rng(seed)
     indices = gen.integers(data.shape[0], size=sample_size)
     qs = data[indices, :]
@@ -431,10 +431,15 @@ def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
     index.add(data)
     distances = utils.compute_distances(qs, None, distance_metric, index)
     knn_dists = distances[:, k]
-    avg_dists = distances.mean(axis=1)
+    # discard the distances that are 0
+    mask = knn_dists > 0
+    knn_dists = knn_dists[mask]
+    avg_dists = distances[mask].mean(axis=1)
+    ic(knn_dists, avg_dists)
     rcs = avg_dists / knn_dists
     avg_rc = rcs.mean()
     print("Average relative contrast is", avg_rc)
+    assert np.isfinite(avg_rc)
     return avg_rc
 
 
