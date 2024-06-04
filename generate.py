@@ -532,16 +532,6 @@ def _rc(x, dataset, distance_fn, k):
     return jnp.mean(dists) / dists[k]
 
 
-def build_relative_contrast_loss(k, distance_fn, target_low, target_high):
-    def inner(x, dataset):
-        rc = _rc(x, dataset, distance_fn, k)
-        if target_low <= rc <= target_high:
-            return 0.0
-        return min(abs(rc - target_low), abs(rc - target_high))
-
-    return inner
-
-
 def generate_query_sgd(
     dataset,
     distance_metric,
@@ -551,6 +541,7 @@ def generate_query_sgd(
     learning_rate=1.0,
     max_iter=1000,
     seed=1234,
+    start_point=None,
     return_progress=False,
 ):
     assert target_low <= target_high
@@ -564,14 +555,14 @@ def generate_query_sgd(
     t_start = time.time()
     progress = []
 
-    relative_contrast_loss = build_relative_contrast_loss(
-        k, distance_fn, target_low, target_high
-    )
-    grad_fn = jax.value_and_grad(relative_contrast_loss)
+    grad_fn = jax.value_and_grad(_rc)
 
     rng = np.random.default_rng(seed)
     optimizer = optax.adam(learning_rate)
-    x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
+    if start_point is None:
+        x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
+    else:
+        x = start_point + rng.normal(size=dataset.shape[1], scale=0.001)
     if distance_metric == "angular":
         x /= jnp.linalg.norm(x)
     opt_state = optimizer.init(x)
@@ -580,9 +571,9 @@ def generate_query_sgd(
         # TODO: make the loss directly the  relative contrast. Then if the RC is below the desired
         # range we use the negative of the gradient, otherwise we use it as is.
         # This allows to avoid computing the relative contrast twice when reporting the contrast
-        value, grads = grad_fn(x, dataset)
+        rc, grads = grad_fn(x, dataset, distance_fn, k)
+        assert np.isfinite(rc)
         if return_progress:
-            rc = _rc(x, dataset, distance_fn, k)
             progress.append(
                 {
                     "iteration": i,
@@ -590,24 +581,30 @@ def generate_query_sgd(
                     "elapsed_s": time.time() - t_start
                 }
             )
-        if value == 0.0:
+        if target_low <= rc and rc <= target_high:
             break
         logging.debug(
-            "[%d] still %.4f to the target range (%.4f, %.4f)",
+            "[%d] rc=%.4f (target range [%.4f, %.4f])",
             i,
-            value,
+            rc,
             target_low,
             target_high,
         )
+
         if distance_metric == "angular":
             # project the gradients on the tangent plane
             grads = grads - jnp.dot(grads, x) * x
             grads /= jnp.linalg.norm(grads)
 
+        if rc < target_low:
+            grads = -grads
+
         updates, opt_state = optimizer.update(grads, opt_state)
         x = optax.apply_updates(x, updates)
         if distance_metric == "angular":
             x /= jnp.linalg.norm(x)
+
+        assert np.all(np.isfinite(x))
 
     if return_progress:
         return x, progress
@@ -684,6 +681,12 @@ def generate_workload_sgd(
         raise ValueError(f"Unknown format `{queries_output}`")
 
 
+def sample_indices(num_queries, dataset, seed):
+    """Samples the required number of indices, valid in the given dataset"""
+    gen = np.random.default_rng(seed)
+    return gen.integers(0, dataset.shape[0] - 1, size=num_queries)
+
+
 def annealing_measure_convergence(
     dataset_input,
     output,
@@ -697,7 +700,7 @@ def annealing_measure_convergence(
     import pandas as pd
     import json
 
-    gen = np.random.default_rng(1234)
+    gen = np.random.default_rng(seed)
 
     results = []
 
@@ -733,7 +736,9 @@ def annealing_measure_convergence(
 
     target = 0.0
 
-    for q_idx in range(num_queries):
+    indices = sample_indices(num_queries, dataset, seed)
+
+    for q_idx in indices:
         x = dataset[q_idx]
         _, _, progress = annealing(
             score,
@@ -782,7 +787,10 @@ def sgd_measure_convergence(
     # so that we just do all the repetitions
     target = 0.0
 
-    for q_idx in range(num_queries):
+    indices = sample_indices(num_queries, dataset, seed)
+
+    for q_idx in indices:
+        start = dataset[q_idx]
         _, progress = generate_query_sgd(
             dataset,
             distance_metric,
@@ -791,8 +799,9 @@ def sgd_measure_convergence(
             target,
             learning_rate,
             max_steps,
-            seed + q_idx,
+            seed=seed + q_idx,
             return_progress=True,
+            start_point=start
         )
         progress = pd.DataFrame(progress)
         progress["query_index"] = q_idx
@@ -814,10 +823,10 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    annealing_measure_convergence(
+    sgd_measure_convergence(
         ".data/fashion-mnist-784-euclidean.hdf5",
         "/tmp/convergence.csv",
         k=10,
         num_queries=1,
-        max_steps=100
+        max_steps=1000
     )

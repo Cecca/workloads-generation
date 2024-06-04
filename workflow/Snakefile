@@ -271,24 +271,51 @@ rule convergence_plot:
     run:
         import pandas as pd
         import seaborn.objects as so
+        import seaborn as sns
+
+        import matplotlib
+        import matplotlib.pyplot as plt
+        matplotlib.use("Agg")
 
         df = pd.read_csv(input[0])
-        print(df.columns)
-        (
+
+        agg_base = (
           so.Plot(df, x="elapsed_s", y="rc", color="method", group="query_index")
             .layout(size=(14, 7))
             .add(so.Line())
             .facet("dataset")
-            .save(output[0])
+            .plot(pyplot=True)
         )
+
+        def panel_plot(data, **kwargs):
+            for qidx in data["query_index"].unique():
+                for method in data["method"].unique():
+                    line_data = data[(data["query_index"] == qidx) & (data["method"] == method)]
+                    plt.plot(line_data["elapsed_s"], line_data["rc"], alpha=0.3, **kwargs)
+            # now overlay the averages
+            agg = data.groupby(["dataset", "method", "iteration"])[["rc", "elapsed_s"]].mean()
+            plt.plot(agg["elapsed_s"], agg["rc"], linewidth=2, **kwargs)
+
+        g = sns.FacetGrid(df, col="dataset", hue="method", aspect=2, height=7)
+        g.map_dataframe(panel_plot)
+        g.add_legend()
+        g.savefig(output[0])
 
 
 rule convergence:
     input:
         expand(os.path.join(RES_DIR, "convergence", "{method}", "{dataset}.csv"), 
                method=["sgd", "annealing"],
-               #method=[ "sgd"],
-               dataset=["fashion_mnist-euclidean-784-60K"])
+               dataset=[
+                  "fashion_mnist-euclidean-784-60K",
+                  "glove-angular-104-1183514",
+                  "nytimes-angular-256-289761",
+                  "sald-128-100m",
+                  "astro-256-100m",
+                  "deep1b-96-100m",
+                  "seismic-256-100m",
+                  "rw-256-100m",
+               ])
     output:
         os.path.join(RES_DIR, "convergence", "all.csv")
     run:
@@ -306,24 +333,27 @@ rule convergence_one:
         import generate
         import logging
 
+        num_queries = 10
+        k = 10
+
         logging.basicConfig(level=logging.DEBUG)
 
         if wildcards["method"] == "sgd":
             generate.sgd_measure_convergence(
                 input[0],
                 output[0],
-                k=10,
-                num_queries=1,
+                k=k,
+                num_queries=num_queries,
                 learning_rate=10,
-                max_steps=101
+                max_steps=200
             )
         else:
             generate.annealing_measure_convergence(
                 input[0],
                 output[0],
-                k=10,
-                num_queries=1,
-                max_steps=1001
+                k=k,
+                num_queries=num_queries,
+                max_steps=1000
             )
 
         
@@ -779,7 +809,12 @@ rule paper_all:
     input:
         "paper/index-table.tex",
         "paper/actual_relative_contrasts.png",
-        "paper/actual_lid.png"
+        "paper/actual_lid.png",
+        "paper/correlations_rc_10.png",
+        "paper/correlations_exp_20|10.png",
+        "paper/correlations_eps_0.5.png",
+        "paper/correlations_eps_0.05.png",
+        "paper/correlations-bars.png",
 
 
 rule paper_index_table:
@@ -871,4 +906,135 @@ rule paper_actual_relative_contrasts:
             .save(output[1])
         )
 
-        
+rule paper_correlations_specific:
+    input:
+        "results_nefeli/all-metrics.csv"
+    output:
+        "paper/correlations_{metric}.png",
+    run:
+        import pandas as pd
+        import numpy as np
+        import seaborn as sns
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        metric = wildcards["metric"]
+
+        df = pd.read_csv(input[0])
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+
+        # remove outliers
+        if metric in ["rc_10", "exp_20|10"]:
+            q = df[metric].quantile(0.99)
+            df = df[df[metric] < q]
+
+        def quantizer(group, column="rc_10"):
+            group["binned_col"] = pd.cut(group[column], 100)
+            group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
+            return group
+
+
+        def quantize_by(df, column="rc_10"):
+            df = df.groupby("dataset").apply(quantizer, column, include_groups=False).reset_index()
+            del df["level_1"]
+            corrs = df.groupby("dataset").corr("kendall")["distcomp"].reset_index()
+            corrs.columns = ["dataset", "metric", "correlation"]
+            corrs = corrs[corrs["metric"] != "distcomp"]
+            corrs.set_index("dataset", inplace=True)
+            corrs = corrs["correlation"]
+            return df, corrs
+
+        df, corrs = quantize_by(df, metric)
+
+        g = sns.FacetGrid(df, col="dataset", sharex=False, sharey=False)
+        g.map_dataframe(
+            sns.scatterplot,
+            x = metric,
+            y = "distcomp"
+        )
+
+        for (i, j, _), fdata in g.facet_data():
+            dataset = fdata["dataset"].unique()[0]
+            ax = g.facet_axis(i, j)
+            xtext = 1 if metric in ["rc_10", "exp_20|10"] else 0
+            ha = "right" if metric in ["rc_10", "exp_20|10"] else "left"
+            ax.text(xtext, 1, "$\\tau$=%.3f" % (corrs.loc[dataset]),
+                    size=15,
+                    transform=ax.transAxes, 
+                    ha=ha, 
+                    va="top",
+                    parse_math=True)
+
+        g.set(yscale="log")
+        g.set(xscale="log")
+        g.tight_layout()
+        g.savefig(output[0])
+
+
+rule paper_correlations_bars:
+    input:
+        "results_nefeli/all-metrics.csv"
+    output:
+        "paper/correlations-bars.png",
+    run:
+        import pandas as pd
+        import numpy as np
+        import seaborn.objects as so
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        df = pd.read_csv(input[0])
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+
+
+        def quantizer(group, column="rc_10"):
+            group = group[np.isfinite(group[column])].copy()
+            group["binned_col"] = pd.cut(group[column], 100)
+            group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
+            return group
+
+
+        def quantize_by(df, column="rc_10"):
+            df = df.groupby("dataset").apply(quantizer, column, include_groups=False).reset_index()
+            del df["level_1"]
+            corrs = df.groupby("dataset").corr("kendall")["distcomp"].reset_index()
+            corrs = corrs[corrs["level_1"] != "distcomp"]
+            del corrs["level_1"]
+            corrs.set_index("dataset", inplace=True)
+            corrs.columns = [column]
+            return df, corrs
+
+        dfs = []
+        for metric in ["lid_10", "rc_10", "exp_20|10"] + ["eps_" + str(e) for e in [ 0.05, 0.1, 0.5, 1 ]]:
+            # remove outliers
+            if metric in ["rc_10", "exp_20|10"]:
+                q = df[metric].quantile(0.99)
+                ldf = df[df[metric] < q]
+            else:
+                ldf = df.copy()
+            _f, corrs = quantize_by(ldf, metric)
+            dfs.append(corrs)
+
+        corrs = dfs[0]
+        for df in dfs[1:]:
+            corrs = pd.merge(corrs, df, left_index=True, right_index=True)
+        corrs = corrs.stack().reset_index()
+        corrs.columns = ["dataset", "metric", "correlation"]
+        corrs["sign"] = corrs["correlation"] > 0
+        corrs["correlation"] = np.abs( corrs["correlation"] )
+
+        (
+          so.Plot(corrs,
+                  x="correlation",
+                  y="metric",
+                  color="sign")
+            .facet(row="dataset")
+            .add(so.Bars())
+            .layout(size=(8, 12))
+            .save(output[0])
+        )
+
+            
+            
