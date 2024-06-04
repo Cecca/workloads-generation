@@ -541,6 +541,7 @@ def generate_query_sgd(
     learning_rate=1.0,
     max_iter=1000,
     seed=1234,
+    start_point=None,
     return_progress=False,
 ):
     assert target_low <= target_high
@@ -558,7 +559,10 @@ def generate_query_sgd(
 
     rng = np.random.default_rng(seed)
     optimizer = optax.adam(learning_rate)
-    x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
+    if start_point is None:
+        x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
+    else:
+        x = start_point + rng.normal(size=dataset.shape[1], scale=0.001)
     if distance_metric == "angular":
         x /= jnp.linalg.norm(x)
     opt_state = optimizer.init(x)
@@ -568,6 +572,7 @@ def generate_query_sgd(
         # range we use the negative of the gradient, otherwise we use it as is.
         # This allows to avoid computing the relative contrast twice when reporting the contrast
         rc, grads = grad_fn(x, dataset, distance_fn, k)
+        assert np.isfinite(rc)
         if return_progress:
             progress.append(
                 {
@@ -585,6 +590,7 @@ def generate_query_sgd(
             target_low,
             target_high,
         )
+
         if distance_metric == "angular":
             # project the gradients on the tangent plane
             grads = grads - jnp.dot(grads, x) * x
@@ -597,6 +603,8 @@ def generate_query_sgd(
         x = optax.apply_updates(x, updates)
         if distance_metric == "angular":
             x /= jnp.linalg.norm(x)
+
+        assert np.all(np.isfinite(x))
 
     if return_progress:
         return x, progress
@@ -673,6 +681,12 @@ def generate_workload_sgd(
         raise ValueError(f"Unknown format `{queries_output}`")
 
 
+def sample_indices(num_queries, dataset, seed):
+    """Samples the required number of indices, valid in the given dataset"""
+    gen = np.random.default_rng(seed)
+    return gen.integers(0, dataset.shape[0] - 1, size=num_queries)
+
+
 def annealing_measure_convergence(
     dataset_input,
     output,
@@ -686,7 +700,7 @@ def annealing_measure_convergence(
     import pandas as pd
     import json
 
-    gen = np.random.default_rng(1234)
+    gen = np.random.default_rng(seed)
 
     results = []
 
@@ -722,7 +736,9 @@ def annealing_measure_convergence(
 
     target = 0.0
 
-    for q_idx in range(num_queries):
+    indices = sample_indices(num_queries, dataset, seed)
+
+    for q_idx in indices:
         x = dataset[q_idx]
         _, _, progress = annealing(
             score,
@@ -771,7 +787,10 @@ def sgd_measure_convergence(
     # so that we just do all the repetitions
     target = 0.0
 
-    for q_idx in range(num_queries):
+    indices = sample_indices(num_queries, dataset, seed)
+
+    for q_idx in indices:
+        start = dataset[q_idx]
         _, progress = generate_query_sgd(
             dataset,
             distance_metric,
@@ -780,8 +799,9 @@ def sgd_measure_convergence(
             target,
             learning_rate,
             max_steps,
-            seed + q_idx,
+            seed=seed + q_idx,
             return_progress=True,
+            start_point=start
         )
         progress = pd.DataFrame(progress)
         progress["query_index"] = q_idx

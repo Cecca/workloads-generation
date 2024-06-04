@@ -271,16 +271,35 @@ rule convergence_plot:
     run:
         import pandas as pd
         import seaborn.objects as so
+        import seaborn as sns
+
+        import matplotlib
+        import matplotlib.pyplot as plt
+        matplotlib.use("Agg")
 
         df = pd.read_csv(input[0])
-        print(df.columns)
-        (
+
+        agg_base = (
           so.Plot(df, x="elapsed_s", y="rc", color="method", group="query_index")
             .layout(size=(14, 7))
             .add(so.Line())
             .facet("dataset")
-            .save(output[0])
+            .plot(pyplot=True)
         )
+
+        def panel_plot(data, **kwargs):
+            for qidx in data["query_index"].unique():
+                for method in data["method"].unique():
+                    line_data = data[(data["query_index"] == qidx) & (data["method"] == method)]
+                    plt.plot(line_data["elapsed_s"], line_data["rc"], alpha=0.3, **kwargs)
+            # now overlay the averages
+            agg = data.groupby(["dataset", "method", "iteration"])[["rc", "elapsed_s"]].mean()
+            plt.plot(agg["elapsed_s"], agg["rc"], linewidth=2, **kwargs)
+
+        g = sns.FacetGrid(df, col="dataset", hue="method", aspect=2, height=7)
+        g.map_dataframe(panel_plot)
+        g.add_legend()
+        g.savefig(output[0])
 
 
 rule convergence:
@@ -306,6 +325,8 @@ rule convergence_one:
         import generate
         import logging
 
+        num_queries = 4
+
         logging.basicConfig(level=logging.DEBUG)
 
         if wildcards["method"] == "sgd":
@@ -313,7 +334,7 @@ rule convergence_one:
                 input[0],
                 output[0],
                 k=10,
-                num_queries=1,
+                num_queries=num_queries,
                 learning_rate=10,
                 max_steps=101
             )
@@ -322,7 +343,7 @@ rule convergence_one:
                 input[0],
                 output[0],
                 k=10,
-                num_queries=1,
+                num_queries=num_queries,
                 max_steps=1001
             )
 
