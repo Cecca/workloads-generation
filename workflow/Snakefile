@@ -306,8 +306,16 @@ rule convergence:
     input:
         expand(os.path.join(RES_DIR, "convergence", "{method}", "{dataset}.csv"), 
                method=["sgd", "annealing"],
-               #method=[ "sgd"],
-               dataset=["fashion_mnist-euclidean-784-60K"])
+               dataset=[
+                  "fashion_mnist-euclidean-784-60K",
+                  "glove-angular-104-1183514",
+                  "nytimes-angular-256-289761",
+                  "sald-128-100m",
+                  "astro-256-100m",
+                  "deep1b-96-100m",
+                  "seismic-256-100m",
+                  "rw-256-100m",
+               ])
     output:
         os.path.join(RES_DIR, "convergence", "all.csv")
     run:
@@ -325,7 +333,8 @@ rule convergence_one:
         import generate
         import logging
 
-        num_queries = 4
+        num_queries = 10
+        k = 10
 
         logging.basicConfig(level=logging.DEBUG)
 
@@ -333,18 +342,18 @@ rule convergence_one:
             generate.sgd_measure_convergence(
                 input[0],
                 output[0],
-                k=10,
+                k=k,
                 num_queries=num_queries,
                 learning_rate=10,
-                max_steps=101
+                max_steps=200
             )
         else:
             generate.annealing_measure_convergence(
                 input[0],
                 output[0],
-                k=10,
+                k=k,
                 num_queries=num_queries,
-                max_steps=1001
+                max_steps=1000
             )
 
         
