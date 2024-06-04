@@ -532,16 +532,6 @@ def _rc(x, dataset, distance_fn, k):
     return jnp.mean(dists) / dists[k]
 
 
-def build_relative_contrast_loss(k, distance_fn, target_low, target_high):
-    def inner(x, dataset):
-        rc = _rc(x, dataset, distance_fn, k)
-        if target_low <= rc <= target_high:
-            return 0.0
-        return min(abs(rc - target_low), abs(rc - target_high))
-
-    return inner
-
-
 def generate_query_sgd(
     dataset,
     distance_metric,
@@ -564,10 +554,7 @@ def generate_query_sgd(
     t_start = time.time()
     progress = []
 
-    relative_contrast_loss = build_relative_contrast_loss(
-        k, distance_fn, target_low, target_high
-    )
-    grad_fn = jax.value_and_grad(relative_contrast_loss)
+    grad_fn = jax.value_and_grad(_rc)
 
     rng = np.random.default_rng(seed)
     optimizer = optax.adam(learning_rate)
@@ -580,9 +567,8 @@ def generate_query_sgd(
         # TODO: make the loss directly the  relative contrast. Then if the RC is below the desired
         # range we use the negative of the gradient, otherwise we use it as is.
         # This allows to avoid computing the relative contrast twice when reporting the contrast
-        value, grads = grad_fn(x, dataset)
+        rc, grads = grad_fn(x, dataset, distance_fn, k)
         if return_progress:
-            rc = _rc(x, dataset, distance_fn, k)
             progress.append(
                 {
                     "iteration": i,
@@ -590,12 +576,12 @@ def generate_query_sgd(
                     "elapsed_s": time.time() - t_start
                 }
             )
-        if value == 0.0:
+        if target_low <= rc and rc <= target_high:
             break
         logging.debug(
-            "[%d] still %.4f to the target range (%.4f, %.4f)",
+            "[%d] rc=%.4f (target range [%.4f, %.4f])",
             i,
-            value,
+            rc,
             target_low,
             target_high,
         )
@@ -603,6 +589,9 @@ def generate_query_sgd(
             # project the gradients on the tangent plane
             grads = grads - jnp.dot(grads, x) * x
             grads /= jnp.linalg.norm(grads)
+
+        if rc < target_low:
+            grads = -grads
 
         updates, opt_state = optimizer.update(grads, opt_state)
         x = optax.apply_updates(x, updates)
@@ -814,10 +803,10 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    annealing_measure_convergence(
+    sgd_measure_convergence(
         ".data/fashion-mnist-784-euclidean.hdf5",
         "/tmp/convergence.csv",
         k=10,
         num_queries=1,
-        max_steps=100
+        max_steps=1000
     )
