@@ -433,7 +433,10 @@ rule index_performance:
         import pandas as pd
         dfs = []
         for csv in input:
-            dfs.append( pd.read_csv(csv) )
+            k = WORKLOADS.config_from_path(csv)["k"]
+            df = pd.read_csv(csv)
+            df["k"] = k
+            dfs.append(df)
         pd.concat(dfs).to_csv(output[0])
 
 rule run_messi_shell:

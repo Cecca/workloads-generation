@@ -36,6 +36,14 @@ class WorkloadPatterns:
     def config_for(self, key):
         return self._workloads_dict[key]
 
+    def config_from_path(self, path):
+        """Extracts the workload key from the given path, and decodes it into the corresponding dictionary"""
+        import re
+        match = re.findall("workload_key~(.+)/", path)
+        if len(match) == 0:
+            raise ValueError("the path does not contain a workload key")
+        return self.config_for(match[0])
+
     @property
     def wildcard_pattern(self):
         return self._wildcard_pattern
