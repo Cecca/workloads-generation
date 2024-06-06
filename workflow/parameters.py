@@ -39,7 +39,7 @@ class WorkloadPatterns:
     def config_from_path(self, path):
         """Extracts the workload key from the given path, and decodes it into the corresponding dictionary"""
         import re
-        match = re.findall("workload_key~(.+)/", path)
+        match = re.findall("workload_key~([a-z0-9]+)/", path)
         if len(match) == 0:
             raise ValueError("the path does not contain a workload key")
         return self.config_for(match[0])
