@@ -267,7 +267,7 @@ rule convergence_plot:
     input:
         os.path.join("results_nefeli", "convergence", "all.csv")
     output:
-        os.path.join(RES_DIR, "convergence", "all.png")
+        os.path.join("paper", "convergence.png")
     run:
         import pandas as pd
         import seaborn.objects as so
@@ -300,6 +300,8 @@ rule convergence_plot:
             aspect=1.5,
             height=2
         )
+        g.set_xlabels("Elapsed time (s)")
+        g.set_ylabels("Relative contrast")
         g.map_dataframe(panel_plot)
         g.add_legend()
         g.tight_layout()
@@ -846,6 +848,10 @@ rule paper_index_table:
         perf["method"] = perf["workload"].str.replace("\\(.*", "", regex=True)
         perf["difficulty"] = perf["workload"].str.extract(r"(easy|medium|hard\+|hard)")
         perf["difficulty"].fillna("-", inplace=True)
+        perf["method"] = perf["method"].str.replace("File", "Baseline")
+
+        perf = perf[perf["difficulty"] != "hard"]
+        perf["difficulty"] = perf["difficulty"].str.replace("+", "")
 
         perf["difficulty"] = pd.Categorical(
             perf["difficulty"],
@@ -854,7 +860,7 @@ rule paper_index_table:
         )
         perf["method"] = pd.Categorical(
             perf["method"],
-            categories=["File", "GaussianNoise", "Annealing", "SGD"],
+            categories=["Baseline", "GaussianNoise", "Annealing", "SGD"],
             ordered=True
         )
 
@@ -862,7 +868,7 @@ rule paper_index_table:
         tab = perf.groupby(["index", "dataset", "method", "difficulty"])[["distcomp"]].mean()
         tab = tab.dropna(axis=0)
         tab = tab.reset_index(["method", "difficulty"]).pivot(columns=["method", "difficulty"], values="distcomp")
-        tab.to_latex(output[0], float_format="%.5f")
+        tab.to_latex(output[0], float_format="%.1e")
 
 
 rule paper_actual_relative_contrasts:
