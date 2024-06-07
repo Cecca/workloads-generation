@@ -423,7 +423,7 @@ rule plot_index_performance:
 rule index_performance:
     input:
         expand(
-            os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv")    ,
+            os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
             index = ["messi", "faiss_hnsw", "faiss_ivf"],
             pattern = WORKLOADS.instance_patterns
         )
@@ -810,24 +810,29 @@ rule convert_annbench_to_bin:
 # results_nefeli directory
 rule paper_all:
     input:
-        "paper/index-table.tex",
-        "paper/actual_relative_contrasts.png",
-        "paper/actual_lid.png",
-        "paper/correlations_rc_10.png",
-        "paper/correlations_exp_20|10.png",
-        "paper/correlations_eps_0.5.png",
-        "paper/correlations_eps_0.05.png",
-        "paper/correlations-bars.png",
+        "paper/index-table-k10.tex",
+        "paper/index-table-k1.tex",
+        "paper/actual_relative_contrasts_k10.png",
+        "paper/actual_relative_contrasts_k1.png",
+        "paper/actual_lid_k10.png",
+        "paper/actual_lid_k1.png",
+    #"paper/correlations_rc_10.png",
+    #"paper/correlations_exp_20|10.png",
+    #"paper/correlations_eps_0.5.png",
+    #"paper/correlations_eps_0.05.png",
+    #"paper/correlations-bars.png",
 
 
 rule paper_index_table:
     input:
-        "results_nefeli/index-performance.csv"
+        "results_nefeli/metrics/index-performance.csv"
     output:
-        "paper/index-table.tex"
+        "paper/index-table-k{k}.tex"
     run:
         import pandas as pd
+        k = int( wildcards["k"] )
         perf = pd.read_csv(input[0])
+        perf = perf[perf["k"] == k]
         perf.rename(columns={"index_name": "index"}, inplace=True)
         perf.replace("File.*", "File", regex=True, inplace=True)
         perf.replace("faiss_ivf", "FaissIVF", regex=True, inplace=True)
@@ -858,15 +863,20 @@ rule paper_index_table:
 
 rule paper_actual_relative_contrasts:
     input:
-        "results_nefeli/all-metrics.csv"
+        "results_nefeli/metrics/all-metrics.csv"
     output:
-        "paper/actual_relative_contrasts.png",
-        "paper/actual_lid.png"
+        "paper/actual_relative_contrasts_k{k}.png",
+        "paper/actual_lid_k{k}.png"
     run:
         import pandas as pd
         import seaborn.objects as so
+        
+        k = int( wildcards["k"] )
+        rc_col = f"rc_{k}"
+        lid_col = f"lid_{k}"
+
         metrics = pd.read_csv(input[0])
-        metrics = metrics[metrics["rc_10"] < 100]
+        metrics = metrics[metrics[rc_col] < 100]
         metrics.replace("fashion_mnist", "fashion-mnist", regex=True, inplace=True)
         metrics.replace({"dataset": "-.*"}, "", regex=True, inplace=True)
         metrics["method"] = metrics["workload_description"].str.replace("\\(.*", "", regex=True)
@@ -886,7 +896,7 @@ rule paper_actual_relative_contrasts:
 
         p = (
           so.Plot(metrics,
-                  x="rc_10",
+                  x=rc_col,
                   y="method",
                   color="difficulty")
             .layout(size=(14, 7))
@@ -898,7 +908,7 @@ rule paper_actual_relative_contrasts:
         )
         p = (
           so.Plot(metrics,
-                  x="lid_10",
+                  x=lid_col,
                   y="method",
                   color="difficulty")
             .layout(size=(8, 16))
