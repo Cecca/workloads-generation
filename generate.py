@@ -695,6 +695,7 @@ def annealing_measure_convergence(
     initial_temperature=1.0,
     max_steps=2000,
     seed=1234,
+    data_limit=read_data.MAX_DATA_LEN
 ):
     """Keeps track of the convergence of SGD as well as the running time."""
     import pandas as pd
@@ -704,7 +705,7 @@ def annealing_measure_convergence(
 
     results = []
 
-    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train", data_limit=data_limit)
 
     index = faiss.IndexFlatL2(dataset.shape[1])
     index.add(dataset)
@@ -775,6 +776,7 @@ def sgd_measure_convergence(
     learning_rate=1.0,
     max_steps=2000,
     seed=1234,
+    data_limit=read_data.MAX_DATA_LEN
 ):
     """Keeps track of the convergence of SGD as well as the running time."""
     import pandas as pd
@@ -782,7 +784,7 @@ def sgd_measure_convergence(
 
     results = []
 
-    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train", data_limit=data_limit)
     # we set the target to 0.0 (which is unattainable for the relative contrast) 
     # so that we just do all the repetitions
     target = 0.0
