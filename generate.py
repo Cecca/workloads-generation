@@ -695,7 +695,8 @@ def annealing_measure_convergence(
     initial_temperature=1.0,
     max_steps=2000,
     seed=1234,
-    data_limit=read_data.MAX_DATA_LEN
+    data_limit=read_data.MAX_DATA_LEN,
+    target_class=None
 ):
     """Keeps track of the convergence of SGD as well as the running time."""
     import pandas as pd
@@ -735,7 +736,26 @@ def annealing_measure_convergence(
     score_transforms = {"rc": transform_rc, "faiss_ivf": lambda s: s}
     score_transform = score_transforms[metric]
 
-    target = 0.0
+    if target_class is not None:
+        avg_rc = _average_rc(dataset, distance_metric, k)
+        if distance_metric == "angular":
+            target_rc = {
+                "easy": (avg_rc - 1) * 1.5 + 1,
+                "medium": (avg_rc - 1) * 1.0 + 1,
+                "hard": (avg_rc - 1) / 2 + 1,
+            }[target_class]
+        else:
+            target_rc = {
+                "easy": (avg_rc - 1) / 2 + 1,
+                "medium": (avg_rc - 1) / 10 + 1,
+                "hard": (avg_rc - 1) / 100 + 1,
+            }[target_class]
+        delta = 0.05 * target_rc
+        target_low = target_rc + delta
+        target_high = target_rc - delta
+    else:
+        target_low = 0.0
+        target_high = 0.0
 
     indices = sample_indices(num_queries, dataset, seed)
 
@@ -745,8 +765,8 @@ def annealing_measure_convergence(
             score,
             x,
             gen_neighbor,
-            target,
-            target,
+            score_transform( target_low ),
+            score_transform( target_high ),
             fast_annealing_schedule(initial_temperature),
             max_steps=max_steps,
             return_progress=True,
@@ -776,7 +796,8 @@ def sgd_measure_convergence(
     learning_rate=1.0,
     max_steps=2000,
     seed=1234,
-    data_limit=read_data.MAX_DATA_LEN
+    data_limit=read_data.MAX_DATA_LEN,
+    target_class=None
 ):
     """Keeps track of the convergence of SGD as well as the running time."""
     import pandas as pd
@@ -785,9 +806,26 @@ def sgd_measure_convergence(
     results = []
 
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train", data_limit=data_limit)
-    # we set the target to 0.0 (which is unattainable for the relative contrast) 
-    # so that we just do all the repetitions
-    target = 0.0
+    if target_class is not None:
+        avg_rc = _average_rc(dataset, distance_metric, k)
+        if distance_metric == "angular":
+            target_rc = {
+                "easy": (avg_rc - 1) * 1.5 + 1,
+                "medium": (avg_rc - 1) * 1.0 + 1,
+                "hard": (avg_rc - 1) / 2 + 1,
+            }[target_class]
+        else:
+            target_rc = {
+                "easy": (avg_rc - 1) / 2 + 1,
+                "medium": (avg_rc - 1) / 10 + 1,
+                "hard": (avg_rc - 1) / 100 + 1,
+            }[target_class]
+        delta = 0.05 * target_rc
+        target_low = target_rc - delta
+        target_high = target_rc + delta
+    else:
+        target_low = 0.0
+        target_high = 0.0
 
     indices = sample_indices(num_queries, dataset, seed)
 
@@ -797,8 +835,8 @@ def sgd_measure_convergence(
             dataset,
             distance_metric,
             k,
-            target,
-            target,
+            target_low,
+            target_high,
             learning_rate,
             max_steps,
             seed=seed + q_idx,
@@ -825,10 +863,11 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    sgd_measure_convergence(
+    annealing_measure_convergence(
         ".data/fashion-mnist-784-euclidean.hdf5",
         "/tmp/convergence.csv",
         k=10,
         num_queries=1,
-        max_steps=1000
+        max_steps=1000,
+        target_class="medium"
     )
