@@ -230,7 +230,7 @@ rule plot_difficulty:
 
 rule convergence_plot:
     input:
-        os.path.join("results_nefeli", "convergence", "all.csv")
+        os.path.join(RES_DIR, "convergence", "all.csv")
     output:
         os.path.join("paper", "convergence.png")
     run:
@@ -294,6 +294,24 @@ rule convergence:
         df = pd.concat((pd.read_csv(f) for f in input))
         df.to_csv(output[0], index=False)
 
+rule convergence_scale:
+    input:
+        expand(os.path.join(RES_DIR, "scales","convergence","{data_limit}","{method}","{dataset}.csv"), 
+               method=["sgd", "annealing"],
+               data_limit=[5000000,10000000],
+               dataset=[
+                  "sald-128-100m",
+                  # "astro-256-100m",
+                  # "deep1b-96-100m",
+                  # "seismic-256-100m",
+                  # "rw-256-100m",
+               ])
+    output:
+        os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
+    run:
+        import pandas as pd
+        df = pd.concat((pd.read_csv(f) for f in input))
+        df.to_csv(output[0], index=False)
 
 rule convergence_one:
     input:
@@ -327,7 +345,42 @@ rule convergence_one:
                 max_steps=1000
             )
 
-        
+rule convergence_one_scale:
+    input:
+        os.path.join(DATA_DIR, "{dataset}.bin")
+    output:
+        os.path.join(RES_DIR,"scales","convergence","{data_limit}","{method}","{dataset}.csv")
+    run:
+        import generate
+        import logging
+
+        num_queries = 10
+        k = 10
+        target_class = "hard"
+
+        logging.basicConfig(level=logging.DEBUG)
+
+        if wildcards["method"] == "sgd":
+            generate.sgd_measure_convergence(
+                input[0],
+                output[0],
+                k=k,
+                num_queries=num_queries,
+                learning_rate=10,
+                max_steps=200,
+                data_limit=int(wildcards["data_limit"]),
+                target_class=target_class
+            )
+        else:
+            generate.annealing_measure_convergence(
+                input[0],
+                output[0],
+                k=k,
+                num_queries=num_queries,
+                max_steps=1000,
+                data_limit=int(wildcards["data_limit"]),
+                target_class=target_class
+            )        
 
 
 ######################################################################
