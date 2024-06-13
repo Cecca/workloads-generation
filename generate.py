@@ -429,15 +429,22 @@ def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
     data = np.delete(data, indices, axis=0)
     index = faiss.IndexFlatL2(data.shape[1])
     index.add(data)
-    distances = utils.compute_distances(qs, None, distance_metric, index)
-    knn_dists = distances[:, k]
-    # discard the distances that are 0
-    mask = knn_dists > 0
-    knn_dists = knn_dists[mask]
-    avg_dists = distances[mask].mean(axis=1)
-    ic(knn_dists, avg_dists)
-    rcs = avg_dists / knn_dists
-    avg_rc = rcs.mean()
+
+    avg_rc = 0
+    cnt = 0
+    for qidx in range(sample_size):
+        q = qs[qidx]
+        distances = utils.compute_distances(q, None, distance_metric, index)[0]
+        knn_dist = distances[k]
+        # discard the distances that are 0
+        if knn_dist <= 0.0:
+            continue
+        avg_dists = distances.mean()
+        rc = avg_dists / knn_dist
+        avg_rc += rc
+        cnt += 1
+
+    avg_rc = avg_rc / cnt
     print("Average relative contrast is", avg_rc)
     assert np.isfinite(avg_rc)
     return avg_rc
@@ -861,9 +868,9 @@ def sgd_measure_convergence(
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.DEBUG)
 
-    annealing_measure_convergence(
+    sgd_measure_convergence(
         ".data/fashion-mnist-784-euclidean.hdf5",
         "/tmp/convergence.csv",
         k=10,
