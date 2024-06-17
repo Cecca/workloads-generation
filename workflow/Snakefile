@@ -310,8 +310,14 @@ rule convergence_scale:
         os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
     run:
         import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
+        import re
+
+        for csv_file in input:
+            data_limit = int(re.findall("scales/convergence/(\d+)", csv_file)[0])
+            df = pd.read_csv(f)
+            df["data_limit"] = data_limit
+            dfs.append(df)
+        pd.concat(dfs).to_csv(output[0])
 
 rule convergence_one:
     input:
