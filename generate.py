@@ -784,6 +784,7 @@ def annealing_measure_convergence(
 
     res = pd.concat(results)
     res["dataset"] = dataset_input
+    res["data_limit"] = data_limit
     res["method"] = "annealing"
     res["method_params"] = json.dumps({
         "initial_temperature": initial_temperature,
@@ -856,12 +857,14 @@ def sgd_measure_convergence(
 
     res = pd.concat(results)
     res["dataset"] = dataset_input
+    res["data_limit"] = data_limit
     res["method"] = "sgd"
     res["method_params"] = json.dumps({
         "learning_rate": learning_rate,
         "max_steps": max_steps,
         "seed": seed
     }, sort_keys=True)
+    
 
     res.to_csv(output, index=False)
 

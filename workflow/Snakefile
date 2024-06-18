@@ -294,24 +294,6 @@ rule convergence:
         df = pd.concat((pd.read_csv(f) for f in input))
         df.to_csv(output[0], index=False)
 
-rule convergence_scale:
-    input:
-        expand(os.path.join(RES_DIR, "scales","convergence","{data_limit}","{method}","{dataset}.csv"), 
-               method=["sgd", "annealing"],
-               data_limit=[5000000,10000000],
-               dataset=[
-                  "sald-128-100m",
-                  # "astro-256-100m",
-                  # "deep1b-96-100m",
-                  # "seismic-256-100m",
-                  # "rw-256-100m",
-               ])
-    output:
-        os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
-    run:
-        import pandas as pd
-        df = pd.concat((pd.read_csv(f) for f in input))
-        df.to_csv(output[0], index=False)
 
 rule convergence_one:
     input:
@@ -344,6 +326,78 @@ rule convergence_one:
                 num_queries=num_queries,
                 max_steps=1000
             )
+
+
+rule convergence_scale_plot:
+    input:
+        os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
+    output:
+        os.path.join("paper", "convergence_scales.png")
+    run:
+        import pandas as pd
+        import seaborn.objects as so
+        import seaborn as sns
+
+        import matplotlib
+        import matplotlib.pyplot as plt
+        matplotlib.use("Agg")
+
+        df = pd.read_csv(input[0])
+        df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df["dataset_scale"] = df["dataset"] + df["scale"]
+
+        def panel_plot(data, **kwargs):
+            for qidx in data["query_index"].unique():
+                for method in data["method"].unique():   
+                    line_data = data[(data["query_index"] == qidx) & (data["method"] == method)]
+                    plt.plot(line_data["elapsed_s"], line_data["rc"], alpha=0.2, **kwargs)
+            # now overlay the averages
+            agg = data.groupby(["dataset_scale", "method", "iteration"])[["rc", "elapsed_s"]].mean()
+            plt.plot(agg["elapsed_s"], agg["rc"], linewidth=2, **kwargs)
+
+        g = sns.FacetGrid(
+            df,
+            col="dataset_scale",
+            col_wrap=4,
+            hue="method",
+            sharex=False,
+            sharey=False,
+            aspect=1.5,
+            height=2
+        )
+        g.set_xlabels("Elapsed time (s)")
+        g.set_ylabels("Relative contrast")
+        g.map_dataframe(panel_plot)
+        g.add_legend()
+        g.tight_layout()
+        g.savefig(output[0])
+
+
+rule convergence_scale:
+    input:
+        expand(os.path.join(RES_DIR, "scales","convergence","{data_limit}","{method}","{dataset}.csv"), 
+               method=["sgd", "annealing"],
+               data_limit=[5000000,10000000, 15000000],
+               dataset=[
+                  "sald-128-100m",
+                  # "astro-256-100m",
+                  # "deep1b-96-100m",
+                  # "seismic-256-100m",
+                  # "rw-256-100m",
+               ])
+    output:
+        os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
+    run:
+        import pandas as pd
+        dfs = []
+        for f in input: 
+            data_limit = int(re.findall("scales/convergence/(\d+)", f)[0])
+            df = pd.read_csv(f) 
+            df["scale"] = f'_{int(data_limit/1000000)}m' 
+            dfs.append(df) 
+        pd.concat(dfs).to_csv(output[0]) 
+
 
 rule convergence_one_scale:
     input:
