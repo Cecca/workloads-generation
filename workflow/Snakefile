@@ -351,38 +351,39 @@ rule convergence_scale_stats:
         df = pd.read_csv(input[0])
         df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
-        df["data_limit"] = df["data_limit"].astype(str).str.replace("000000$", "M", regex=True)
-        df["data_limit"] = pd.Categorical(
-            df["data_limit"],
-            categories=["5M", "10M", "15M"],
+        df["scale"] = df["scale"].astype(str).str.replace("_", "", regex=False)
+        df["scale"] = pd.Categorical(
+            df["scale"],
+            categories=["5m", "10m", "15m"],
             ordered=True
         )
 
         iteration_times = df.groupby([
-            "dataset", "data_limit", "method", "query_index"
+            "dataset", "scale", "method", "query_index"
         ]).apply(compute_iteration_times).reset_index()
+        print("unique datasets", df[[ "dataset", "scale" ]])
 
         avg_iteration_times = iteration_times.groupby([
-            "dataset", "data_limit", "method"
+            "dataset", "scale", "method"
         ])["iteration_time_s"].mean().reset_index()
 
         exec_times = df.groupby([
-            "dataset", "data_limit", "method", "query_index"
+            "dataset", "scale", "method", "query_index"
         ])["elapsed_s"].max().reset_index().groupby([
-            "dataset", "data_limit", "method"
+            "dataset", "scale", "method"
         ])["elapsed_s"].mean().reset_index()
 
         time_info = pd.merge(exec_times, avg_iteration_times)
 
         sns.barplot(
             data = avg_iteration_times,
-            x = "data_limit",
+            x = "scale",
             y = "iteration_time_s",
             hue = "method"
         )
         plt.savefig(output[0])
 
-        summary = time_info.pivot(columns="method", values=["iteration_time_s", "elapsed_s"], index=[ "dataset", "data_limit" ])
+        summary = time_info.pivot(columns="method", values=["iteration_time_s", "elapsed_s"], index=[ "dataset", "scale" ])
         summary.to_latex(output[1], float_format="%.1f")
         
         
