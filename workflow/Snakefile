@@ -443,7 +443,7 @@ rule convergence_scale:
                dataset=[
                   "sald-128-100m",
                   # "astro-256-100m",
-                  # "deep1b-96-100m",
+                  "deep1b-96-100m",
                   # "seismic-256-100m",
                   # "rw-256-100m",
                ])
