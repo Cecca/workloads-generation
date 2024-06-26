@@ -48,6 +48,8 @@ GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
 MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/")
 
+print("Results directory", RES_DIR)
+
 # Here we list the minimum accepted snakemake version
 from snakemake.utils import min_version
 min_version("8.4")
@@ -326,6 +328,66 @@ rule convergence_one:
                 num_queries=num_queries,
                 max_steps=1000
             )
+
+
+rule convergence_scale_stats:
+    input:
+        os.path.join(RES_DIR, "scales", "convergence", "all_scales.csv")
+    output:
+        os.path.join("paper", "avg_iteration_times.png"),
+        os.path.join("paper", "times.tex")
+    run:
+        import pandas as pd
+        import seaborn as sns
+        import matplotlib
+        import matplotlib.pyplot as plt
+        matplotlib.use("Agg")
+
+        def compute_iteration_times(group):
+            col = group["elapsed_s"] - group["elapsed_s"].shift().fillna(0)
+            col.name = "iteration_time_s"
+            return col
+
+        df = pd.read_csv(input[0])
+        df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df["scale"] = df["scale"].astype(str).str.replace("_", "", regex=False)
+        df["scale"] = pd.Categorical(
+            df["scale"],
+            categories=["5m", "10m", "15m"],
+            ordered=True
+        )
+
+        iteration_times = df.groupby([
+            "dataset", "scale", "method", "query_index"
+        ]).apply(compute_iteration_times).reset_index()
+        print("unique datasets", df[[ "dataset", "scale" ]])
+
+        avg_iteration_times = iteration_times.groupby([
+            "dataset", "scale", "method"
+        ])["iteration_time_s"].mean().reset_index()
+
+        exec_times = df.groupby([
+            "dataset", "scale", "method", "query_index"
+        ])["elapsed_s"].max().reset_index().groupby([
+            "dataset", "scale", "method"
+        ])["elapsed_s"].mean().reset_index()
+
+        time_info = pd.merge(exec_times, avg_iteration_times)
+
+        sns.barplot(
+            data = avg_iteration_times,
+            x = "scale",
+            y = "iteration_time_s",
+            hue = "method"
+        )
+        plt.savefig(output[0])
+
+        summary = time_info.pivot(columns="method", values=["iteration_time_s", "elapsed_s"], index=[ "dataset", "scale" ])
+        summary.to_latex(output[1], float_format="%.1f")
+        
+        
+    
 
 
 rule convergence_scale_plot:
