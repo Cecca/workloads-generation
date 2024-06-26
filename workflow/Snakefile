@@ -381,9 +381,9 @@ rule convergence_scale:
                data_limit=[5000000,10000000, 15000000],
                dataset=[
                   "sald-128-100m",
-                  # "astro-256-100m",
+                  "astro-256-100m",
                   "deep1b-96-100m",
-                  # "seismic-256-100m",
+                  "seismic-256-100m",
                   # "rw-256-100m",
                ])
     output:
