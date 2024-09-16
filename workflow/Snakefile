@@ -47,6 +47,8 @@ DATA_DIR = os.environ.get("WORKGEN_DATA_DIR", ".data") # on nefeli: export WORKG
 GENERATED_DIR = os.path.join(DATA_DIR, "generated")
 RES_DIR = os.environ.get("WORKGEN_RES_DIR", "results") # on nefeli: export WORKGEN_RES_DIR=/mnt/hddhelp/workgen_results/
 MESSI_DIR = os.environ.get("MESSI_INSTALL_DIR", "/home/qwang/projects/isax-modularized/build/")
+MESSI_DIR_B = os.environ.get("MESSI_INSTALL_DIR", "/mnt/hddhelp/ts_benchmarks/messi/")
+DSTREE_DIR = os.environ.get("DSTREE_INSTALL_DIR", "/mnt/hddhelp/ts_benchmarks/dstree/ds-tree-c/")
 
 print("Results directory", RES_DIR)
 
@@ -564,7 +566,7 @@ rule index_performance:
     input:
         expand(
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
-            index = ["messi", "faiss_hnsw", "faiss_ivf"],
+            index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
             pattern = WORKLOADS.instance_patterns
         )
     output:
@@ -579,6 +581,117 @@ rule index_performance:
             dfs.append(df)
         pd.concat(dfs).to_csv(output[0])
 
+# rule run_messi_shell:
+#     input:
+#         data = os.path.join(DATA_DIR, "{dataset}.bin"),
+#         workload =
+#           os.path.join(GENERATED_DIR,
+#             f"{WORKLOADS.wildcard_pattern}.bin"
+#           ),
+
+#     output:
+#         os.path.join(
+#           RES_DIR, 
+#           f"metrics/messi/{WORKLOADS.wildcard_pattern}/results.csv"
+#         ),
+#     threads: workflow.cores
+#     log:
+#          os.path.join(RES_DIR,f"logs/messi/{WORKLOADS.wildcard_pattern}.log")
+#     run:
+#         import read_data as rd
+#         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+#         k = workload_config["k"]
+#         _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
+#         _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
+#         assert slength == q_slength
+#         data_samples = min(data_samples, rd.MAX_DATA_LEN)
+#         index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
+#         print("Loading the first", data_samples, "vectors for MESSI")
+
+#         # how much cheaper is a SAX distance computation wrt a full distance
+#         # computation. We use this to aggregate the two types of distances into
+#         # a single one
+#         sax_rescale = config["sax_length"] / slength
+
+#         # FIXME: how dow we get the running time per query?
+
+#         try:
+#             os.remove(log[0])
+#         except FileNotFoundError:
+#             pass
+
+#         shell(MESSI_DIR + "/isax \
+# --database_filepath='{input.data}' \
+# --query_filepath='{input.workload}' \
+# --database_size={data_samples} \
+# --query_size={q_samples} \
+# --sax_length={config[sax_length]} \
+# --sax_cardinality={config[sax_card]} \
+# --cpu_cores={config[cpu_cores]} \
+# --log_filepath='{log}' \
+# --series_length={slength} \
+# --adhoc_breakpoints \
+# --leaf_size={config[leaf_size]} \
+# --k={k} \
+# --exact_search \
+# --with_id ")
+
+# ## new messi shell
+# ## ./bin/MESSI --dataset /data/qwang/datasets/sald-128-100m.bin  --initial-lbl-size 2000 --leaf-size 2000 --min-leaf-size 2000 --function-type 3 --cpu-type 82 --dataset-size 5000000 --flush-limit 300000 --read-block 20000 --queries /data/qwang/datasets/sald-128-1k.bin --queries-size 10 --queue-number 2 --timeseries-size 128 --in-memory --topk --k-size 10
+
+# #         shell(MESSI_DIR_B + "bin/MESSI \
+# # --dataset '{input.data}' \
+# # --initial-lbl-size 2000 \
+# # --leaf-size {config[leaf_size]} \
+# # --min-leaf-size 2000 \
+# # --queries='{input.workload}' \
+# # --dataset-size {data_samples} \
+# # --queries-size {q_samples} \
+# # --timeseries-size={slength} \
+# # --topk \
+# # --k-size {k} \
+# # --function-type 3 \
+# # --cpu-type 82 \
+# # --flush-limit 300000 \
+# # --read-block 20000 \
+# # --queue-number 2 \
+# # --in-memory \
+# # > '{log}' ")
+
+#         res = []
+#         for line_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 6,8,11", read=True, iterable=True)):
+#             q_idx, dists, sax_dist = list(map(int, log_line.split()))
+#             # distcomp = dists + sax_rescale * sax_dist
+#             distcomp = dists
+#             distcomp = distcomp / data_samples
+
+#             alg_name = "messi"
+#             recall = 1.0
+
+#             if q_idx >= q_samples:
+#                 alg_name = "messi_apprx"
+#                 q_idx -= q_samples
+#                 recall = None
+
+#             res.append({
+#                 "dataset": wildcards["dataset"],
+#                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
+#                 "query_index": q_idx,
+#                 "index_name": alg_name,
+#                 "index_params": "",
+#                 "time_s": None,
+#                 "distcomp": distcomp,
+#                 "recall": recall,
+#             })
+#         try:
+#             os.remove(output[0])
+#         except FileNotFoundError:
+#             pass
+
+#         df = pd.DataFrame(res)
+#         df.to_csv(output[0], index=False)
+
+## messi version of Botao ##
 rule run_messi_shell:
     input:
         data = os.path.join(DATA_DIR, "{dataset}.bin"),
@@ -586,6 +699,7 @@ rule run_messi_shell:
           os.path.join(GENERATED_DIR,
             f"{WORKLOADS.wildcard_pattern}.bin"
           ),
+
     output:
         os.path.join(
           RES_DIR, 
@@ -602,6 +716,7 @@ rule run_messi_shell:
         _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
         assert slength == q_slength
         data_samples = min(data_samples, rd.MAX_DATA_LEN)
+        index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
         print("Loading the first", data_samples, "vectors for MESSI")
 
         # how much cheaper is a SAX distance computation wrt a full distance
@@ -616,36 +731,41 @@ rule run_messi_shell:
         except FileNotFoundError:
             pass
 
-        shell(MESSI_DIR + "/isax \
---database_filepath='{input.data}' \
---query_filepath='{input.workload}' \
---database_size={data_samples} \
---query_size={q_samples} \
---sax_length={config[sax_length]} \
---sax_cardinality={config[sax_card]} \
---cpu_cores={config[cpu_cores]} \
---log_filepath='{log}' \
---series_length={slength} \
---adhoc_breakpoints \
---leaf_size={config[leaf_size]} \
---k={k} \
---exact_search \
---with_id ")
+
+# shell example
+# ./bin/MESSI --dataset /data/qwang/datasets/sald-128-100m.bin  --initial-lbl-size 2000 --leaf-size 2000 --min-leaf-size 2000 --function-type 3 --cpu-type 82 --dataset-size 5000000 --flush-limit 300000 --read-block 20000 --queries /data/qwang/datasets/sald-128-1k.bin --queries-size 10 --queue-number 2 --timeseries-size 128 --in-memory --topk --k-size 10
+
+        shell(MESSI_DIR_B + "bin/MESSI \
+--dataset '{input.data}' \
+--initial-lbl-size 2000 \
+--leaf-size {config[leaf_size]} \
+--min-leaf-size 2000 \
+--queries='{input.workload}' \
+--dataset-size {data_samples} \
+--queries-size {q_samples} \
+--timeseries-size {slength} \
+--sax-cardinality {config[sax_card]} \
+--topk \
+--k-size {k} \
+--function-type 3 \
+--cpu-type 82 \
+--flush-limit 300000 \
+--read-block 20000 \
+--queue-number 2 \
+--in-memory \
+> '{log}' ")
+
+# grep -F 'query' ../tmp/messi_test.log | cut -f 2,4
 
         res = []
-        for line_idx, log_line in enumerate(shell("grep -F 'l2square' {log} | grep 'query_engine.c' | cut -d ' ' -f 6,8,11", read=True, iterable=True)):
-            q_idx, dists, sax_dist = list(map(int, log_line.split()))
+        for line_idx, log_line in enumerate(shell("grep -F 'query' {log} |  cut -f 2,4", read=True, iterable=True)):
+            q_idx, dists = list(map(int, log_line.split()))
             # distcomp = dists + sax_rescale * sax_dist
             distcomp = dists
-            distcomp = distcomp / data_samples
+            distcomp = distcomp / data_samples 
 
             alg_name = "messi"
             recall = 1.0
-
-            if q_idx >= q_samples:
-                alg_name = "messi_apprx"
-                q_idx -= q_samples
-                recall = None
 
             res.append({
                 "dataset": wildcards["dataset"],
@@ -665,6 +785,100 @@ rule run_messi_shell:
         df = pd.DataFrame(res)
         df.to_csv(output[0], index=False)
 
+rule run_dstree_shell:
+    input:
+        data = os.path.join(DATA_DIR, "{dataset}.bin"),
+        workload =
+          os.path.join(GENERATED_DIR,
+            f"{WORKLOADS.wildcard_pattern}.bin"
+          ),
+
+    output:
+        os.path.join(
+          RES_DIR, 
+          f"metrics/dstree/{WORKLOADS.wildcard_pattern}/results.csv"
+        ),
+    threads: workflow.cores
+    log:
+         os.path.join(RES_DIR,f"logs/dstree/{WORKLOADS.wildcard_pattern}.log")
+    run:
+        import read_data as rd
+        workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
+        k = workload_config["k"]
+        _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
+        _, q_samples, q_slength, _ = rd.parse_filename(wildcards["workload_file"])
+        assert slength == q_slength
+        data_samples = min(data_samples, rd.MAX_DATA_LEN)
+        index = os.path.join(RES_DIR, "index/dstree/", wildcards["dataset"])
+        print("Loading the first", data_samples, "vectors for DS-TREE")
+
+        try:
+            os.remove(log[0])
+        except FileNotFoundError:
+            pass
+
+##- -  just index - -
+## bin/dstree --dataset /mnt/hddhelp/workgen_data/sald-128-100m.bin --dataset-size 5000000 --buffer-size 19531 --leaf-size 1000 --index-path /mnt/hddhelp/ts_benchmarks/dstree/out/  --ascii-input 0 --mode 0 --timeseries-size 128
+
+## - - just query — -
+## bin/dstree --dataset /mnt/hddhelp/workgen_data/sald-128-100m.bin --dataset-size 5000000  --queries /mnt/hddhelp/workgen_data/sald-128-1k.bin  --queries-size 100 --buffer-size 19531 --leaf-size 1000 --index-path /mnt/hddhelp/ts_benchmarks/dstree/out/  --ascii-input 0 --mode 1 --timeseries-size 128 --k 1 --epsilon 0 --delta 1
+        if not os.path.exists(index):
+            shell(DSTREE_DIR + "bin/dstree \
+                --dataset '{input.data}' \
+                --dataset-size {data_samples} \
+                --buffer-size 19531 \
+                --leaf-size 1000 \
+                --index-path '{index}' \
+                --ascii-input 0 \
+                --mode 0 \
+                --timeseries-size {slength} ")
+
+        shell(DSTREE_DIR + "bin/dstree \
+            --dataset '{input.data}' \
+            --dataset-size {data_samples} \
+            --queries '{input.workload}' \
+            --queries-size {q_samples} \
+            --buffer-size 19531 \
+            --leaf-size 1000 \
+            --index-path '{index}' \
+            --ascii-input 0 \
+            --mode 1 \
+            --timeseries-size {slength} \
+            --k 1 \
+            --epsilon 0 \
+            --delta 1 \
+            > '{log}'")
+
+
+# grep -F 'Query_total_loaded_ts_count' {log}  | grep '1$' | cut  -f 2,4
+
+        res = []
+        for line_idx, log_line in enumerate(shell("grep -F 'Query_total_loaded_ts_count' {log}  | grep '1$' | cut  -f 2,4", read=True, iterable=True)):
+            dists, q_idx = list(map(int, log_line.split()))
+            # distcomp = dists + sax_rescale * sax_dist
+            distcomp = dists 
+            distcomp = distcomp / data_samples 
+
+            alg_name = "dstree"
+            recall = 1.0
+
+            res.append({
+                "dataset": wildcards["dataset"],
+                "workload": WORKLOADS.description_for(wildcards["workload_key"]),
+                "query_index": q_idx,
+                "index_name": alg_name,
+                "index_params": "",
+                "time_s": None,
+                "distcomp": distcomp,
+                "recall": recall,
+            })
+        try:
+            os.remove(output[0])
+        except FileNotFoundError:
+            pass
+
+        df = pd.DataFrame(res)
+        df.to_csv(output[0], index=False)
 
 rule run_faiss_hnsw:
     input:

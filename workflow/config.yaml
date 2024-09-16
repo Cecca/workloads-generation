@@ -1,4 +1,4 @@
 sax_length: 16
 sax_card: 8
-leaf_size: 20000
+leaf_size: 2000
 cpu_cores: 16
