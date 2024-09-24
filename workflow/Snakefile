@@ -710,6 +710,7 @@ rule run_messi_shell:
          os.path.join(RES_DIR,f"logs/messi/{WORKLOADS.wildcard_pattern}.log")
     run:
         import read_data as rd
+        import numpy as np
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
         _, data_samples, slength, _ = rd.parse_filename(wildcards["dataset"])
@@ -717,6 +718,14 @@ rule run_messi_shell:
         assert slength == q_slength
         data_samples = min(data_samples, rd.MAX_DATA_LEN)
         index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
+
+        # check that data and queries are normalized
+        data, _ = rd.read_multiformat(wildcards["dataset"], "train")
+        np.all(np.isclose(np.linalg.norm(data, axis=1), 1))
+        queries, _ = rd.read_multiformat(wildcards["workload_file"], "test")
+        np.all(np.isclose(np.linalg.norm(queries, axis=1), 1))
+        data = None
+        queries = None
         
         leaf_size = 2000
         min_leaf_size = 2000
