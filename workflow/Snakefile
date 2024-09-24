@@ -717,6 +717,11 @@ rule run_messi_shell:
         assert slength == q_slength
         data_samples = min(data_samples, rd.MAX_DATA_LEN)
         index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
+        
+        leaf_size = 2000
+        min_leaf_size = 2000
+        initial_lbl_size = 2000
+
         print("Loading the first", data_samples, "vectors for MESSI")
 
         # how much cheaper is a SAX distance computation wrt a full distance
@@ -732,14 +737,26 @@ rule run_messi_shell:
             pass
 
 
+
+        if (wildcards["dataset"]=="fashion_mnist-euclidean-784-60K"):
+            leaf_size = 60000
+            min_leaf_size = 60000
+            initial_lbl_size = 60000
+
+
+
+
+
 # shell example
 # ./bin/MESSI --dataset /data/qwang/datasets/sald-128-100m.bin  --initial-lbl-size 2000 --leaf-size 2000 --min-leaf-size 2000 --function-type 3 --cpu-type 82 --dataset-size 5000000 --flush-limit 300000 --read-block 20000 --queries /data/qwang/datasets/sald-128-1k.bin --queries-size 10 --queue-number 2 --timeseries-size 128 --in-memory --topk --k-size 10
 
+
+
         shell(MESSI_DIR_B + "bin/MESSI \
 --dataset '{input.data}' \
---initial-lbl-size 2000 \
---leaf-size {config[leaf_size]} \
---min-leaf-size 2000 \
+--initial-lbl-size {initial_lbl_size} \
+--leaf-size {leaf_size} \
+--min-leaf-size {min_leaf_size} \
 --queries='{input.workload}' \
 --dataset-size {data_samples} \
 --queries-size {q_samples} \
