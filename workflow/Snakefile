@@ -720,9 +720,9 @@ rule run_messi_shell:
         index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
 
         # check that data and queries are normalized
-        data, _ = rd.read_multiformat(wildcards["dataset"], "train")
+        data, _ = rd.read_multiformat(input["data"], "train")
         assert np.all(np.isclose(np.linalg.norm(data, axis=1), 1))
-        queries, _ = rd.read_multiformat(wildcards["workload_file"], "test")
+        queries, _ = rd.read_multiformat(input["workload"], "test")
         assert np.all(np.isclose(np.linalg.norm(queries, axis=1), 1))
         data = None
         queries = None
