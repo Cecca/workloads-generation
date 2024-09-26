@@ -176,8 +176,9 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN, repair=True):
         np.isfinite(data)
     ), f"Some values are infinite or NaN in file: {path}\n{data}"
 
-    if distance_metric == "angular":
-        data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
+    # NOTE: normalize all datasets, irrespective of the distance metric.
+    # The reason is that MESSI expects data points to have unit norm.
+    data = data / np.linalg.norm(data, axis=1)[:, np.newaxis]
 
     print("Loaded", data.shape[0], "vectors in", data.shape[1], "dimensions")
 
