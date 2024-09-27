@@ -249,6 +249,8 @@ rule convergence_plot:
         df = pd.read_csv(input[0])
         df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df["method"] = df["method"].str.replace("sgd", "Hephaestus-Gradient")
+        df["method"] = df["method"].str.replace("annealing", "Hephaestus-Annealing")
 
         def panel_plot(data, **kwargs):
             for qidx in data["query_index"].unique():
@@ -1224,7 +1226,8 @@ rule paper_index_table:
         perf["difficulty"].fillna("-", inplace=True)
         perf["method"] = perf["method"].str.replace("File", "Baseline")
 
-        perf = perf[perf["difficulty"] != "hard"]
+        print(perf["workload"].unique())
+        perf = perf[perf["difficulty"] != "hard+"]
         perf["difficulty"] = perf["difficulty"].str.replace("+", "")
 
         perf["difficulty"] = pd.Categorical(
@@ -1242,7 +1245,8 @@ rule paper_index_table:
         tab = perf.groupby(["index", "dataset", "method", "difficulty"])[["distcomp"]].mean()
         tab = tab.dropna(axis=0)
         tab = tab.reset_index(["method", "difficulty"]).pivot(columns=["method", "difficulty"], values="distcomp")
-        tab.to_latex(output[0], float_format="%.1e")
+        tab.to_latex(output[0], float_format="%.5f", column_format="ll|r|rrr|rrr|rrr")
+        #tab.to_latex(output[0], float_format="%.1e")
 
 
 rule paper_actual_relative_contrasts:
