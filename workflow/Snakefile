@@ -1501,7 +1501,7 @@ rule sota_distcomps:
             ax.set_xlim((0, 1))
 
 
-        fig, axs = plt.subplots(nrows=ndatasets, ncols=3, figsize=(10, 4))
+        fig, axs = plt.subplots(nrows=ndatasets, ncols=4, figsize=(10, 4))
 
         for i, dataset in enumerate( sorted( df["dataset"].unique() ) ):
             for j, index in enumerate(df["index_name"].unique()):
@@ -1527,7 +1527,7 @@ rule sota_distcomps:
 
         axs[-1][1].set_xlabel("fraction of distance computations")
 
-        plt.tight_layout()
+        plt.tight_layout(pad=0)
         plt.savefig(output["main"], dpi=300)
 
         # LEGEND
