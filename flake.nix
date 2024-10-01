@@ -17,6 +17,12 @@
             python311
             ruff
             snakemake
+
+            # Compiling MESSI c code
+            readline
+            autoconf
+            automake
+            gcc6 # the build pipeline does not work with a more recent gcc
           ] ++
           (with pkgs.python311Packages; [
             pip
