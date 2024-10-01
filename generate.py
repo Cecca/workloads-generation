@@ -19,7 +19,6 @@ import logging
 import jax
 import jax.numpy as jnp
 import optax
-from cache import MEM
 
 
 def generate_queries_gaussian_noise(
@@ -443,7 +442,6 @@ def neighbor_generator_euclidean(scale, rng):
     return inner
 
 
-@MEM.cache
 def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
     gen = np.random.default_rng(seed)
     indices = gen.integers(data.shape[0], size=sample_size)
@@ -982,14 +980,19 @@ def generate_workload_empirical_difficulty(
     dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
     print("loaded dataset with shape", dataset.shape)
 
-    avg_rc = _average_rc(dataset, distance_metric, k)
-
     exact_index = faiss.IndexFlatL2(dataset.shape[1])
     exact_index.add(dataset)
-    empirical_difficulty_evaluator = metrics.EmpiricalDifficultyHNSW(
-        dataset, 0.95, exact_index, distance_metric
-    )
 
+    if index_name.lower() in ["hnsw", "faiss_hnsw", "faiss-hnsw"]:
+        empirical_difficulty_evaluator = metrics.EmpiricalDifficultyHNSW(
+            dataset, 0.95, exact_index, distance_metric
+        )
+    elif index_name.lower() in ["ivf", "faiss_ivf", "faiss-ivf"]:
+        empirical_difficulty_evaluator = metrics.EmpiricalDifficultyIVF(
+            dataset, 0.95, exact_index, distance_metric
+        )
+    else:
+        raise ValueError("unknown index `" + index_name + "`")
 
     queries = generate_queries_sgd(
         dataset,
@@ -1017,7 +1020,7 @@ def generate_workload_empirical_difficulty(
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     generate_workload_empirical_difficulty(
         ".data/fashion-mnist-784-euclidean.hdf5",
@@ -1025,7 +1028,7 @@ if __name__ == "__main__":
         k=10,
         empirical_difficulty_range=(0.5, 1.0),
         learning_rate=10.0,
-        index_name="faiss-hnsw",
+        index_name="ivf",
         num_queries=1,
         max_steps=1000
     )
