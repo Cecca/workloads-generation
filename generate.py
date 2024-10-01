@@ -2,13 +2,15 @@
 This module collects approaches to generate workloads for a given dataset.
 """
 
+from re import search
 from icecream import ic
 import os
 import numpy as np
+from scipy.spatial import distance
 import read_data
 import dimensionality_measures as dm
 import metrics
-from metrics import EmpiricalDifficultyIVF
+from metrics import EmpiricalDifficultyHNSW, EmpiricalDifficultyIVF
 import faiss
 import utils
 import time
@@ -17,6 +19,7 @@ import logging
 import jax
 import jax.numpy as jnp
 import optax
+from cache import MEM
 
 
 def generate_queries_gaussian_noise(
@@ -130,11 +133,12 @@ def generate_queries_annealing(
     scoring_functions = {
         "rc": relative_contrast_scorer(index, distance_metric, k),
         "faiss_ivf": faiss_ivf_scorer(index, dataset, distance_metric, k),
+        "hnsw": hnsw_scorer(index, dataset, distance_metric, k),
     }
     score = scoring_functions[metric]
 
     score_transforms = {"rc": transform_rc, "faiss_ivf": lambda s: s}
-    score_transform = score_transforms[metric]
+    score_transform = score_transforms.get(metric, lambda s: s)
     target_low = score_transform(target_low)
     target_high = score_transform(target_high)
 
@@ -370,6 +374,23 @@ def partition_by(candidates, fun):
     return cur_res
 
 
+def hnsw_scorer(
+    exact_index, dataset, distance_metric, k, recall=0.95, n_list=None
+):
+    """
+    Score a point by the fraction of distance computations (wrt to the total) that the
+    hnsw index has to do to reach a given target recall.
+    """
+    difficulty_hnsw = EmpiricalDifficultyHNSW(
+        dataset, recall, exact_index, distance_metric
+    )
+
+    def inner(x):
+        return difficulty_hnsw.evaluate(x, k)
+
+    return inner
+
+
 def faiss_ivf_scorer(
     exact_index, dataset, distance_metric, k, recall=0.95, n_list=None
 ):
@@ -422,6 +443,7 @@ def neighbor_generator_euclidean(scale, rng):
     return inner
 
 
+@MEM.cache
 def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
     gen = np.random.default_rng(seed)
     indices = gen.integers(data.shape[0], size=sample_size)
@@ -550,6 +572,7 @@ def generate_query_sgd(
     seed=1234,
     start_point=None,
     return_progress=False,
+    scoring_function=None
 ):
     assert target_low <= target_high
     if distance_metric == "euclidean":
@@ -575,9 +598,6 @@ def generate_query_sgd(
     opt_state = optimizer.init(x)
 
     for i in range(max_iter):
-        # TODO: make the loss directly the  relative contrast. Then if the RC is below the desired
-        # range we use the negative of the gradient, otherwise we use it as is.
-        # This allows to avoid computing the relative contrast twice when reporting the contrast
         rc, grads = grad_fn(x, dataset, distance_fn, k)
         assert np.isfinite(rc)
         if return_progress:
@@ -588,23 +608,31 @@ def generate_query_sgd(
                     "elapsed_s": time.time() - t_start
                 }
             )
-        if target_low <= rc and rc <= target_high:
-            break
+        if scoring_function is not None:
+            score = scoring_function(x)
+        else:
+            score = rc
         logging.debug(
-            "[%d] rc=%.4f (target range [%.4f, %.4f])",
+            "[%d] rc=%.4f score=%.4f (target range [%.4f, %.4f])",
             i,
             rc,
+            score,
             target_low,
             target_high,
         )
+        if target_low <= score and score <= target_high:
+            break
 
         if distance_metric == "angular":
             # project the gradients on the tangent plane
             grads = grads - jnp.dot(grads, x) * x
             grads /= jnp.linalg.norm(grads)
 
-        if rc < target_low:
+        if score > target_high:
             grads = -grads
+        
+        # if score < target_low:
+        #     grads = -grads
 
         updates, opt_state = optimizer.update(grads, opt_state)
         x = optax.apply_updates(x, updates)
@@ -617,6 +645,46 @@ def generate_query_sgd(
         return x, progress
     else:
         return x
+
+
+def generate_queries_sgd(
+    dataset,
+    distance_metric,
+    k,
+    num_queries,
+    target_low,
+    target_high,
+    learning_rate=1.0,
+    max_iter=1000,
+    scoring_function=None,
+    seed=1234,
+    start_point=None,
+    return_progress=False,
+    threads=1,
+):
+    queries = []
+
+    with ThreadPoolExecutor(threads) as pool:
+        tasks = {
+            pool.submit(
+                generate_query_sgd,
+                dataset,
+                distance_metric,
+                k,
+                target_low,
+                target_high,
+                learning_rate=learning_rate,
+                max_iter=max_iter,
+                scoring_function=scoring_function,
+                seed=seed,
+            ): seed
+            for seed in [seed + s for s in range(num_queries)]
+        }
+        for future in tasks:
+            query = future.result()
+            queries.append(query)
+
+    return np.vstack(queries).astype(np.float32)
 
 
 def generate_workload_sgd(
@@ -844,8 +912,7 @@ def sgd_measure_convergence(
             distance_metric,
             k,
             target_low,
-            target_high,
-            learning_rate,
+            target_high, learning_rate,
             max_steps,
             seed=seed + q_idx,
             return_progress=True,
@@ -869,15 +936,96 @@ def sgd_measure_convergence(
     res.to_csv(output, index=False)
 
 
+SEARCH_LT    = -1
+SEARCH_FOUND = 0 
+SEARCH_GT    = 1
+
+
+def search_range_by(range, fun):
+    lower = range[0]
+    upper = range[1]
+
+    cur_res = None
+    while lower < upper:
+        mid = (lower + upper) / 2
+        mid_res = fun(mid)
+        if mid_res == SEARCH_FOUND:
+            return mid_res
+        elif mid_res == SEARCH_LT:
+            cur_res = mid_res
+            upper = mid
+        else:
+            cur_res = mid_res
+            lower = mid
+
+    return cur_res
+
+
+def generate_workload_empirical_difficulty(
+    dataset_input,
+    queries_output,
+    k,
+    index_name,
+    empirical_difficulty_range: tuple[float, float],
+    num_queries,
+    learning_rate=1.0,
+    max_steps=1000,
+    seed=1234,
+    threads=os.cpu_count(),
+):
+    """
+    Create a workload where the average empirical difficulty
+    is within the specified range, for the given index.
+    The queries are generated with Hephaestus-Gradient.
+    """
+
+    dataset, distance_metric = read_data.read_multiformat(dataset_input, "train")
+    print("loaded dataset with shape", dataset.shape)
+
+    avg_rc = _average_rc(dataset, distance_metric, k)
+
+    exact_index = faiss.IndexFlatL2(dataset.shape[1])
+    exact_index.add(dataset)
+    empirical_difficulty_evaluator = metrics.EmpiricalDifficultyHNSW(
+        dataset, 0.95, exact_index, distance_metric
+    )
+
+
+    queries = generate_queries_sgd(
+        dataset,
+        distance_metric,
+        k,
+        num_queries,
+        target_low=empirical_difficulty_range[0],
+        target_high=empirical_difficulty_range[1],
+        learning_rate=learning_rate,
+        max_iter=max_steps,
+        scoring_function=lambda x: empirical_difficulty_evaluator.evaluate(x, k)
+    )
+
+    if queries_output.endswith(".bin"):
+        assert np.all(np.isfinite(queries))
+        queries.tofile(queries_output)
+        check, _ = read_data.read_multiformat(queries_output, "", repair=False)
+        assert np.all(np.isclose(check, queries))
+    elif queries_output.endswith(".hdf5"):
+        write_queries_hdf5(queries, queries_output)
+    else:
+        raise ValueError(f"Unknown format `{queries_output}`")
+
+
+
 if __name__ == "__main__":
     import logging
-    #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
-    sgd_measure_convergence(
+    generate_workload_empirical_difficulty(
         ".data/fashion-mnist-784-euclidean.hdf5",
-        "/tmp/convergence.csv",
+        "/tmp/queries.hdf5",
         k=10,
+        empirical_difficulty_range=(0.5, 1.0),
+        learning_rate=10.0,
+        index_name="faiss-hnsw",
         num_queries=1,
-        max_steps=1000,
-        target_class="medium"
+        max_steps=1000
     )

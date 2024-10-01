@@ -175,6 +175,58 @@ class EmpiricalDifficultyIVF(object):
             )
 
 
+class EmpiricalDifficultyHNSW(object):
+    """
+    Stores (and possibly caches on a file) a FAISS-HNSW index to evaluate the difficulty
+    of queries, using the number of computed distances as a proxy for the difficulty.
+    """
+
+    def __init__(self, dataset, recall, exact_index, distance_metric):
+        self.index = indices.build_faiss_hnsw(dataset)
+        self.exact_index = exact_index
+        self.recall = recall
+        self.distance_metric = distance_metric
+
+    def evaluate(self, x, k, distances=None):
+        """Evaluates the empirical difficulty of the given point `x` for the given `k`.
+        Returns the number of distance computations, scaled by the number of datasets.
+        Optionally uses distances computed elsewhere.
+        """
+        start = time.time()
+        if distances is None:
+            distances = compute_distances(
+                x, None, self.distance_metric, self.exact_index
+            )[0, :]
+        assert distances.shape[0] == self.index.ntotal
+        elapsed_bf = time.time() - start
+
+        def tester(efsearch):
+            # we need to lock the execution because the statistics collection is
+            # not thread safe, in that it uses global variables.
+            with FAISS_LOCK:
+                faiss.cvar.hnsw_stats.reset()
+                self.index.hnsw.efSearch = efsearch
+                run_dists = compute_distances(x, k, self.distance_metric, self.index)[0]
+                stats = faiss.cvar.hnsw_stats
+                distcomp = stats.n1 + stats.n2 + stats.n3 + stats.ndis
+
+            rec = compute_recall(distances, run_dists, k)
+            if rec >= self.recall:
+                return distcomp / self.index.ntotal
+            else:
+                return None
+
+        start = time.time()
+        dist_frac = partition_by(list(range(1, self.index.ntotal)), tester)
+
+        if dist_frac is not None:
+            return dist_frac
+        else:
+            raise Exception(
+                "Could not get the desired recall, even visiting the entire dataset"
+            )
+
+
 def metrics_csv(
     dataset_path,
     queries_path,
