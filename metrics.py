@@ -245,6 +245,24 @@ class EmpiricalDifficultyMESSI(object):
         return dist_frac
 
 
+class EmpiricalDifficultyDSTree(object):
+    """
+    Evaluates the empirical difficulty of queries for the DS-tree index, using the fraction
+    of computed distances as a proxy for the difficulty.
+    """
+
+    def __init__(self, dataset):
+        self.index = indices.DSTreeWrapper(data=dataset, executable="ds-tree-c/bin/dstree")
+
+    def evaluate(self, x, k, distances=None):
+        """Evaluates the empirical difficulty of the given point `x` for the given `k`.
+        Returns the number of distance computations, scaled by the number of datasets.
+        Optionally uses distances computed elsewhere.
+        """
+        dist_frac = self.index.queries_stats(x, k)[0]
+        return dist_frac
+
+
 
 def metrics_csv(
     dataset_path,

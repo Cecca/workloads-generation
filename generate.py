@@ -995,6 +995,10 @@ def generate_workload_empirical_difficulty(
         empirical_difficulty_evaluator = metrics.EmpiricalDifficultyMESSI(
             dataset
         )
+    elif index_name.lower() in ["dstree"]:
+        empirical_difficulty_evaluator = metrics.EmpiricalDifficultyDSTree(
+            dataset
+        )
     else:
         raise ValueError("unknown index `" + index_name + "`")
 
@@ -1034,7 +1038,7 @@ if __name__ == "__main__":
         k=10,
         empirical_difficulty_range=(0.1, 0.5),
         learning_rate=10.0,
-        index_name="messi",
+        index_name="dstree",
         num_queries=1,
         max_steps=1000
     )
