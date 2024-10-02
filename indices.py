@@ -41,6 +41,7 @@ class MessiWrapper(object):
         sax_card = 8
     ):
         import read_data as rd
+        import logging
 
         assert os.path.isfile(executable)
         self._executable = executable
@@ -71,7 +72,7 @@ class MessiWrapper(object):
         import os
         import read_data as rd
 
-        key = hashlib.sha256(data.data.tobytes()).hexdigest()
+        key = hashlib.sha256(np.array(data).data.tobytes()).hexdigest()
         path = os.path.join("/tmp", key + ".bin")
         if not os.path.isfile(path):
             rd.write_bin(path, data)
@@ -81,12 +82,12 @@ class MessiWrapper(object):
         """Run the given queries through the index and collect statistics about the execution"""
         import subprocess as sp
 
+        queries = np.array(queries)
         if len(queries.shape) == 1:
             queries = queries.reshape(1, -1)
         qpath = self._write_bin_file(queries)
         q_samples = queries.shape[0]
-        ic(q_samples)
-        ic(self._samples)
+        ic(q_samples, qpath)
 
         proc = sp.run([str(a) for a in [
             self._executable,
@@ -108,16 +109,19 @@ class MessiWrapper(object):
             "--queue-number", 2,
             "--in-memory"
         ]], capture_output=True)
+        if proc.returncode != 0:
+            print(proc.stderr.decode())
+            proc.check_returncode()
         output = proc.stdout.decode("utf-8")
 
         res = []
         for log_line in output.splitlines():
+            ic(log_line)
             if not log_line.startswith("query"):
                 continue
             tokens = log_line.split()
             q_idx, dists = tuple(map(int, [tokens[1], tokens[3]]))
             distcomp = dists / self._samples 
-            ic(q_idx, dists, distcomp)
             res.append((q_idx, distcomp))
         res.sort()
         res = [pair[1] for pair in res]

@@ -991,6 +991,10 @@ def generate_workload_empirical_difficulty(
         empirical_difficulty_evaluator = metrics.EmpiricalDifficultyIVF(
             dataset, 0.95, exact_index, distance_metric
         )
+    elif index_name.lower() in ["messi"]:
+        empirical_difficulty_evaluator = metrics.EmpiricalDifficultyMESSI(
+            dataset
+        )
     else:
         raise ValueError("unknown index `" + index_name + "`")
 
@@ -1023,12 +1027,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     generate_workload_empirical_difficulty(
-        ".data/fashion-mnist-784-euclidean.hdf5",
+        # ".data/fashion-mnist-784-angular.hdf5",
+        ".data/fashion_mnist-angular-784-60K.bin",
+        # ".data/glove-25-angular.hdf5",
         "/tmp/queries.hdf5",
         k=10,
-        empirical_difficulty_range=(0.5, 1.0),
+        empirical_difficulty_range=(0.1, 0.5),
         learning_rate=10.0,
-        index_name="ivf",
+        index_name="messi",
         num_queries=1,
         max_steps=1000
     )
