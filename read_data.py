@@ -184,6 +184,19 @@ def read_multiformat(name, what, data_limit=MAX_DATA_LEN, repair=True):
     return data, distance_metric
 
 
+def write_bin(output_path, data, with_padding=True):
+    padsize=None
+    if with_padding:
+        dim = data.shape[1]
+        padsize = (8 - (dim % 8)) % 8
+        print("Padding with", padsize, "dimensions")
+        if padsize > 0:
+            padding = np.zeros((data.shape[0], padsize), dtype=np.float32)
+            data = np.hstack([data, padding])
+    
+    data.tofile(output_path)
+
+
 def hdf5_to_bin(input_path, output_path, what, fname_check=True, with_padding=True):
     assert what in ["train", "test"]
     data, input_distance_metric = read_hdf5(input_path, what)
