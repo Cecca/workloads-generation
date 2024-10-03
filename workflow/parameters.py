@@ -301,19 +301,17 @@ def _empirical_difficulty_workloads():
     datasets = [
         # "fashion_mnist-angular-784-60K",
         "glove-angular-104-1183514",
-        # "nytimes-angular-256-289761",
-        # "sald-128-100m",
-        # "astro-256-100m",
-        # "deep1b-96-100m",
-        # "seismic-256-100m",
-        # "rw-256-100m",
+        "nytimes-angular-256-289761",
+        "sald-128-100m",
+        "astro-256-100m",
+        "deep1b-96-100m",
+        "seismic-256-100m",
+        "rw-256-100m",
     ]
     targets = [(0.5, 0.6), (0.1, 0.2)]
-    targets = [(0.1, 0.2)]
     num_queries = [10]
     k_values = [1]
     indices = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"]
-    indices = ["messi", "faiss_hnsw", "faiss_ivf"]
 
     for dataset, k, nq, index in product(datasets, k_values, num_queries, indices):
         for target_low, target_high in targets:
