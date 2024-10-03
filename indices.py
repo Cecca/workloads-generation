@@ -30,11 +30,21 @@ def build_faiss_hnsw(dataset, index_params="HNSW32"):
     return index
 
 
+def _find_executable(name):
+    import os
+    for dirpath, _, filenames in os.walk("."):
+        for filename in filenames:
+            if filename == name:
+                return os.path.join(dirpath, filename)
+    return None
+
+
+
 class MessiWrapper(object):
     def __init__(
         self,
-        executable,
         data,
+        executable=os.getenv("MESSI_EXE"),
         max_samples=None,
         leaf_size = 2000,
         min_leaf_size = 2000,
@@ -43,6 +53,11 @@ class MessiWrapper(object):
     ):
         import read_data as rd
         import logging
+
+        if executable is None:
+            # try to find the executable atuomatically
+            executable = _find_executable("MESSI")
+            print("Using", executable)
 
         assert os.path.isfile(executable)
         self._executable = executable
@@ -132,12 +147,16 @@ class MessiWrapper(object):
 class DSTreeWrapper(object):
     def __init__(
         self,
-        executable,
         data,
+        executable=os.getenv("DSTREE_EXE"),
         max_samples=None,
     ):
         import read_data as rd
-        import logging
+
+        if executable is None:
+            # try to find the executable atuomatically
+            executable = _find_executable("dstree")
+            print("Using", executable)
 
         assert os.path.isfile(executable)
         self._executable = executable
@@ -244,7 +263,7 @@ if __name__ == "__main__":
     file = ".data/glove-25-angular.hdf5"
     data = h5py.File(file)["train"][:]
     queries = h5py.File(file)["test"][:]
-    dstree = DSTreeWrapper("ds-tree-c/bin/dstree", data)
+    dstree = DSTreeWrapper(data)
     distcomps = dstree.queries_stats(queries[:100,:], 1)
     ic(distcomps)
     ic(distcomps.mean())

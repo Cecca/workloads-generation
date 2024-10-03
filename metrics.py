@@ -234,7 +234,7 @@ class EmpiricalDifficultyMESSI(object):
     """
 
     def __init__(self, dataset):
-        self.index = indices.MessiWrapper(data=dataset, executable="paris_plus_and_messi-main/bin/MESSI")
+        self.index = indices.MessiWrapper(data=dataset)
 
     def evaluate(self, x, k, distances=None):
         """Evaluates the empirical difficulty of the given point `x` for the given `k`.
@@ -252,7 +252,7 @@ class EmpiricalDifficultyDSTree(object):
     """
 
     def __init__(self, dataset):
-        self.index = indices.DSTreeWrapper(data=dataset, executable="ds-tree-c/bin/dstree")
+        self.index = indices.DSTreeWrapper(data=dataset)
 
     def evaluate(self, x, k, distances=None):
         """Evaluates the empirical difficulty of the given point `x` for the given `k`.
