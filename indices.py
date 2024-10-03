@@ -1,5 +1,5 @@
 import os.path
-from cache import MEM
+fro cache import MEM
 import faiss
 import numpy as np
 from threading import Lock
@@ -44,7 +44,7 @@ class MessiWrapper(object):
     def __init__(
         self,
         data,
-        executable=os.getenv("MESSI_EXE"),
+        executable=os.path.join(os.getenv("MESSI_INSTALL_DIR"), "bin/MESSI"),
         max_samples=None,
         leaf_size = 2000,
         min_leaf_size = 2000,
@@ -54,7 +54,7 @@ class MessiWrapper(object):
         import read_data as rd
         import logging
 
-        if executable is None:
+        if executable is None or not os.path.isfile(executable):
             # try to find the executable atuomatically
             executable = _find_executable("MESSI")
             print("Using", executable)
@@ -131,7 +131,6 @@ class MessiWrapper(object):
 
         res = []
         for log_line in output.splitlines():
-            ic(log_line)
             if not log_line.startswith("query"):
                 continue
             tokens = log_line.split()
@@ -148,12 +147,12 @@ class DSTreeWrapper(object):
     def __init__(
         self,
         data,
-        executable=os.getenv("DSTREE_EXE"),
+        executable=os.path.join(os.getenv("DSTREE_INSTALL_DIR"), "bin/dstree"),
         max_samples=None,
     ):
         import read_data as rd
 
-        if executable is None:
+        if executable is None or not os.path.isfile(executable):
             # try to find the executable atuomatically
             executable = _find_executable("dstree")
             print("Using", executable)

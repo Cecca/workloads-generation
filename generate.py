@@ -1011,7 +1011,8 @@ def generate_workload_empirical_difficulty(
         target_high=empirical_difficulty_range[1],
         learning_rate=learning_rate,
         max_iter=max_steps,
-        scoring_function=lambda x: empirical_difficulty_evaluator.evaluate(x, k)
+        scoring_function=lambda x: empirical_difficulty_evaluator.evaluate(x, k),
+        threads=threads
     )
 
     if queries_output.endswith(".bin"):

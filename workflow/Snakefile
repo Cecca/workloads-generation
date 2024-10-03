@@ -63,7 +63,7 @@ from parameters import workloads
 
 # All the workloads considered in our experiments. 
 # See the `parameters` module.
-WORKLOADS= workloads()
+WORKLOADS=workloads()
 
 configfile: "workflow/config.yaml"
 
@@ -143,6 +143,19 @@ rule generate_workload:
                 os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
               ),
               output["workload"]
+            )
+        elif workload_type == "empirical-difficulty-based":
+            print("generating targeting empirical difficulty", workload_config)
+            generate.generate_workload_empirical_difficulty(
+                input[0],
+                output["workload"],
+                k=int(workload_config["k"]),
+                empirical_difficulty_range=(workload_config["target_low"], workload_config["target_high"]),
+                learning_rate=1.0,
+                index_name=workload_config["index"],
+                num_queries=workload_config["num_queries"],
+                max_steps=1000,
+                threads = threads,
             )
         else:
             raise ValueError(f"unknown workload type {workload_type}")
@@ -566,16 +579,19 @@ rule plot_index_performance:
 
 rule index_performance:
     input:
-        expand(
+        [csv for csv in expand(
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
             index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
             pattern = WORKLOADS.instance_patterns
-        )
+        ) if WORKLOADS.config_from_path(csv)["index"] is None
+          or WORKLOADS.config_from_path(csv)["index"] in csv
+        ]
     output:
         os.path.join(RES_DIR, "metrics", "index-performance.csv")
     run:
         import pandas as pd
         dfs = []
+        print("inputs are", input)
         for csv in input:
             k = WORKLOADS.config_from_path(csv)["k"]
             df = pd.read_csv(csv)
