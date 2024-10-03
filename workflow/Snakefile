@@ -950,6 +950,7 @@ rule run_faiss_hnsw:
         import json
         import indices
         from indices import FAISS_LOCK
+        from metrics import EmpiricalDifficultyHNSW
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -958,10 +959,11 @@ rule run_faiss_hnsw:
         ground_truth = np.load(input.ground)["distances"]
 
         print("Populating index")
-        index_params = "HNSW32"
-        index = indices.build_faiss_hnsw(dataset, index_params)
-        print("done")
+        exact_index = faiss.IndexFlatL2(dataset.shape[1])
+        exact_index.add(dataset)
         target_recall = 0.95
+        evaluator= EmpiricalDifficultyHNSW(dataset, target_recall, exact_index, distance_metric)
+        print("done")
 
         res = []
 
@@ -969,22 +971,7 @@ rule run_faiss_hnsw:
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
             ground_distances = ground_truth[q_idx, :] 
-            print("loaded", ground_distances)
-            index.hnsw.efSearch = 1
-            rec = 0
-            n_dist_comp = 0
-            while rec < target_recall and index.hnsw.efSearch < 10**6:
-                with FAISS_LOCK:
-                    faiss.cvar.hnsw_stats.reset()
-                    print("  efSearch", index.hnsw.efSearch)
-                    dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
-                    rec = utils.compute_recall(ground_distances, dists, k)
-                    if rec >= target_recall or index.hnsw.efSearch > 10**6:
-                        stats = faiss.cvar.hnsw_stats
-                        n_dist_comp = stats.n1 + stats.n2 + stats.n3 + stats.ndis
-                        break
-                # we only increment it if we are going to do another iteration
-                index.hnsw.efSearch *= 2
+            distcomp, rec = evaluator.evaluate(q, k, ground_distances, return_recall=True)
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
@@ -992,10 +979,10 @@ rule run_faiss_hnsw:
                 "index_name": "faiss_hnsw",
                 "target_recall": target_recall,
                 "index_params": json.dumps({
-                    "index_params": index_params,
-                    "efSearch": index.hnsw.efSearch
+                    "index_params": evaluator.index_params,
+                    "efSearch": evaluator.index.hnsw.efSearch
                 }, sort_keys=True),
-                "distcomp": n_dist_comp / dataset.shape[0],
+                "distcomp": distcomp,
                 "recall": rec,
             })
         df = pd.DataFrame(res)
@@ -1028,6 +1015,7 @@ rule run_faiss_ivf:
         import json
         import indices
         from indices import FAISS_LOCK
+        from metrics import EmpiricalDifficultyIVF
 
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         k = workload_config["k"]
@@ -1036,11 +1024,11 @@ rule run_faiss_ivf:
         ground_truth = np.load(input.ground)["distances"]
 
         print("Populating index")
-        n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
-        index_params = f"IVF{n_list},Flat"
-        index = indices.build_faiss_ivf(dataset, n_list)
-        print("done")
+        exact_index = faiss.IndexFlatL2(dataset.shape[1])
+        exact_index.add(dataset)
         target_recall = 0.95
+        evaluator= EmpiricalDifficultyIVF(dataset, target_recall, exact_index, distance_metric)
+        print("done")
 
         res = []
 
@@ -1048,21 +1036,7 @@ rule run_faiss_ivf:
             print("running query", q_idx)
             q = queryset[q_idx,:].reshape(1, -1)
             ground_distances = ground_truth[q_idx,:] # utils.compute_distances(q, None, distance_metric, dataset)[0, :]
-            index.nprobe = 1
-            rec = 0
-            n_dist_comp = 0
-            while rec < target_recall and index.nprobe < 10**6:
-                with FAISS_LOCK:
-                    faiss.cvar.indexIVF_stats.reset()
-                    print("  nprobe", index.nprobe)
-                    dists = utils.compute_distances(q, k, distance_metric, index)[0, :]
-                    rec = utils.compute_recall(ground_distances, dists, k)
-                    if rec >= target_recall or index.nprobe > 10**6:
-                        stats = faiss.cvar.indexIVF_stats
-                        n_dist_comp = stats.ndis
-                        break
-                # we only increment it if we are going to do another iteration
-                index.nprobe *= 2
+            distcomp, rec = evaluator.evaluate(q, k, ground_distances, return_recall=True)
             res.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
@@ -1070,10 +1044,10 @@ rule run_faiss_ivf:
                 "index_name": "faiss_ivf",
                 "target_recall": target_recall,
                 "index_params": json.dumps({
-                    "index_params": index_params,
-                    "nprobe": index.nprobe
+                    "index_params": evaluator.index_params,
+                    "nprobe": evaluator.index.nprobe
                 }, sort_keys=True),
-                "distcomp": n_dist_comp / dataset.shape[0],
+                "distcomp": distcomp,
                 "recall": rec,
             })
         df = pd.DataFrame(res)

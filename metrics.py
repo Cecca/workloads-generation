@@ -1,3 +1,4 @@
+from icecream import ic
 import sys
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -128,12 +129,13 @@ class EmpiricalDifficultyIVF(object):
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
         self.n_list = int(np.ceil(np.sqrt(dataset.shape[0])))
+        self.index_params = f"IVF{self.n_list},Flat"
         self.index = indices.build_faiss_ivf(dataset, self.n_list)
         self.exact_index = exact_index
         self.recall = recall
         self.distance_metric = distance_metric
 
-    def evaluate(self, x, k, distances=None):
+    def evaluate(self, x, k, distances=None, return_recall=False):
         """Evaluates the empirical difficulty of the given point `x` for the given `k`.
         Returns the number of distance computations, scaled by the number of datasets.
         Optionally uses distances computed elsewhere.
@@ -143,8 +145,7 @@ class EmpiricalDifficultyIVF(object):
             distances = compute_distances(
                 x, None, self.distance_metric, self.exact_index
             )[0, :]
-        assert distances.shape[0] == self.index.ntotal
-        elapsed_bf = time.time() - start
+        assert distances.shape[0] > k
 
         def tester(nprobe):
             # we need to lock the execution because the statistics collection is
@@ -160,7 +161,10 @@ class EmpiricalDifficultyIVF(object):
 
             rec = compute_recall(distances, run_dists, k)
             if rec >= self.recall:
-                return distcomp / self.index.ntotal
+                if return_recall:
+                    return distcomp / self.index.ntotal, rec
+                else:
+                    return distcomp / self.index.ntotal
             else:
                 return None
 
@@ -183,11 +187,12 @@ class EmpiricalDifficultyHNSW(object):
 
     def __init__(self, dataset, recall, exact_index, distance_metric):
         self.index = indices.build_faiss_hnsw(dataset)
+        self.index_params = "HNSW32"
         self.exact_index = exact_index
         self.recall = recall
         self.distance_metric = distance_metric
 
-    def evaluate(self, x, k, distances=None):
+    def evaluate(self, x, k, distances=None, return_recall=False):
         """Evaluates the empirical difficulty of the given point `x` for the given `k`.
         Returns the number of distance computations, scaled by the number of datasets.
         Optionally uses distances computed elsewhere.
@@ -197,8 +202,7 @@ class EmpiricalDifficultyHNSW(object):
             distances = compute_distances(
                 x, None, self.distance_metric, self.exact_index
             )[0, :]
-        assert distances.shape[0] == self.index.ntotal
-        elapsed_bf = time.time() - start
+        assert distances.shape[0] > k
 
         def tester(efsearch):
             # we need to lock the execution because the statistics collection is
@@ -212,7 +216,10 @@ class EmpiricalDifficultyHNSW(object):
 
             rec = compute_recall(distances, run_dists, k)
             if rec >= self.recall:
-                return distcomp / self.index.ntotal
+                if return_recall:
+                    return distcomp / self.index.ntotal, rec
+                else:
+                    return distcomp / self.index.ntotal
             else:
                 return None
 

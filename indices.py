@@ -1,5 +1,5 @@
 import os.path
-fro cache import MEM
+from cache import MEM
 import faiss
 import numpy as np
 from threading import Lock
