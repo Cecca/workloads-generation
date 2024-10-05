@@ -583,7 +583,7 @@ rule index_performance:
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
             index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
             pattern = WORKLOADS.instance_patterns
-        ) if WORKLOADS.config_from_path(csv)["index"] is None
+        ) if "index" not in WORKLOADS.config_from_path(csv)
           or WORKLOADS.config_from_path(csv)["index"] in csv
         ]
     output:
