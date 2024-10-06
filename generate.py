@@ -570,6 +570,7 @@ def generate_query_sgd(
     seed=1234,
     start_point=None,
     return_progress=False,
+    return_intermediate=False,
     scoring_function=None
 ):
     assert target_low <= target_high
@@ -582,6 +583,7 @@ def generate_query_sgd(
 
     t_start = time.time()
     progress = []
+    intermediate = []
 
     grad_fn = jax.value_and_grad(_rc)
 
@@ -598,6 +600,8 @@ def generate_query_sgd(
     for i in range(max_iter):
         rc, grads = grad_fn(x, dataset, distance_fn, k)
         assert np.isfinite(rc)
+        if return_intermediate:
+            intermediate.append(x)
         if return_progress:
             progress.append(
                 {
@@ -626,8 +630,13 @@ def generate_query_sgd(
             grads = grads - jnp.dot(grads, x) * x
             grads /= jnp.linalg.norm(grads)
 
-        if score > target_high:
-            grads = -grads
+        # FIXME: handle this case in general
+        if scoring_function is not None:
+            if score > target_high:
+                grads = -grads
+        else:
+            if score < target_high:
+                grads = -grads
         
         # if score < target_low:
         #     grads = -grads
@@ -639,6 +648,8 @@ def generate_query_sgd(
 
         assert np.all(np.isfinite(x))
 
+    if return_intermediate:
+        return np.stack(intermediate)
     if return_progress:
         return x, progress
     else:
