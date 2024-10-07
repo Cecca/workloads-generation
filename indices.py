@@ -44,7 +44,7 @@ class MessiWrapper(object):
     def __init__(
         self,
         data,
-        executable=os.path.join(os.getenv("MESSI_INSTALL_DIR"), "bin/MESSI"),
+        executable=os.path.join(os.getenv("MESSI_INSTALL_DIR","/mnt/hddhelp/ts_benchmarks/messi/"), "bin/MESSI"),
         max_samples=None,
         leaf_size = 2000,
         min_leaf_size = 2000,
@@ -147,7 +147,7 @@ class DSTreeWrapper(object):
     def __init__(
         self,
         data,
-        executable=os.path.join(os.getenv("DSTREE_INSTALL_DIR"), "bin/dstree"),
+        executable=os.path.join(os.getenv("DSTREE_INSTALL_DIR","/mnt/hddhelp/ts_benchmarks/dstree/ds-tree-c/"), "bin/dstree"),
         max_samples=None,
     ):
         import read_data as rd
