@@ -77,4 +77,6 @@ def simulate(
 
 simulate(outpath="example-k1.png", with_generate=True, target=8)
 simulate(k=10, outpath="example-k10.png", with_generate=True, target=1.04, delta=0.01)
+simulate(outpath="example-k1-nopath.png", with_generate=False, target=8)
+simulate(k=10, outpath="example-k10-nopath.png", with_generate=False, target=1.04, delta=0.01)
 

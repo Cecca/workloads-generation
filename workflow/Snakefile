@@ -1188,8 +1188,8 @@ rule paper_all:
         "paper/actual_relative_contrasts_k1.png",
         "paper/actual_lid_k10.png",
         "paper/actual_lid_k1.png",
-    #"paper/correlations_rc_10.png",
-    #"paper/correlations_exp_20|10.png",
+        "paper/correlations_rc_10.png",
+        "paper/correlations_exp_20|10.png",
     #"paper/correlations_eps_0.5.png",
     #"paper/correlations_eps_0.05.png",
     #"paper/correlations-bars.png",
@@ -1299,7 +1299,7 @@ rule paper_actual_relative_contrasts:
 
 rule paper_correlations_specific:
     input:
-        "results_nefeli/all-metrics.csv"
+        "results_nefeli/metrics/all-metrics.csv"
     output:
         "paper/correlations_{metric}.png",
     run:
@@ -1314,6 +1314,7 @@ rule paper_correlations_specific:
 
         df = pd.read_csv(input[0])
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df = df[df["dataset"] != "fashion_mnist"]
 
         # remove outliers
         if metric in ["rc_10", "exp_20|10"]:
@@ -1321,7 +1322,10 @@ rule paper_correlations_specific:
             df = df[df[metric] < q]
 
         def quantizer(group, column="rc_10"):
-            group["binned_col"] = pd.cut(group[column], 100)
+            group = group[group[column] >= 0]
+            print(group)
+            nbins = 100
+            group["binned_col"] = pd.cut(group[column], nbins)
             group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
             return group
 
@@ -1332,6 +1336,7 @@ rule paper_correlations_specific:
             corrs = df.groupby("dataset").corr("kendall")["distcomp"].reset_index()
             corrs.columns = ["dataset", "metric", "correlation"]
             corrs = corrs[corrs["metric"] != "distcomp"]
+            corrs["metric"] = corrs["metric"].replace()
             corrs.set_index("dataset", inplace=True)
             corrs = corrs["correlation"]
             return df, corrs
@@ -1345,6 +1350,16 @@ rule paper_correlations_specific:
             y = "distcomp"
         )
 
+        remapping = {
+          "lid_10": "$LID_{10}$",
+          "rc_10": "$RC_{10}$",
+          "exp_20|10": "$Expansion_{20|10}$",
+          "eps_0.05": r"$\alpha_{0.05, 10}$",
+          "eps_0.1": r"$\alpha_{0.1, 10}$",
+          "eps_0.5": r"$\alpha_{0.5, 10}$",
+          "eps_1": r"$\alpha_{1, 10}$",
+        }
+
         for (i, j, _), fdata in g.facet_data():
             dataset = fdata["dataset"].unique()[0]
             ax = g.facet_axis(i, j)
@@ -1357,6 +1372,7 @@ rule paper_correlations_specific:
                     va="top",
                     parse_math=True)
 
+        g.set_axis_labels(x_var=remapping[metric],y_var="empirical hardness")
         g.set(yscale="log")
         g.set(xscale="log")
         g.tight_layout()
@@ -1365,7 +1381,7 @@ rule paper_correlations_specific:
 
 rule paper_correlations_bars:
     input:
-        "results_nefeli/all-metrics.csv"
+        "results_nefeli/metrics/all-metrics.csv"
     output:
         "paper/correlations-bars.png",
     run:
@@ -1373,11 +1389,19 @@ rule paper_correlations_bars:
         import numpy as np
         import seaborn.objects as so
         import matplotlib
+        import matplotlib.pyplot as plt
 
         matplotlib.use("Agg")
 
+        plt.rcParams.update({
+            "text.usetex": True,
+            "font.family": "Helvetica"
+        })
+
         df = pd.read_csv(input[0])
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df = df[df["dataset"] != "fashion_mnist"]
+        print(df)
 
 
         def quantizer(group, column="rc_10"):
@@ -1415,6 +1439,15 @@ rule paper_correlations_bars:
         corrs.columns = ["dataset", "metric", "correlation"]
         corrs["sign"] = corrs["correlation"] > 0
         corrs["correlation"] = np.abs( corrs["correlation"] )
+        corrs["metric"] = corrs["metric"].replace({
+          "lid_10": "$LID_{10}$",
+          "rc_10": "$RC_{10}$",
+          "exp_20|10": "$Expansion_{20|10}$",
+          "eps_0.05": r"$\alpha_{0.05, 10}$",
+          "eps_0.1": r"$\alpha_{0.1, 10}$",
+          "eps_0.5": r"$\alpha_{0.5, 10}$",
+          "eps_1": r"$\alpha_{1, 10}$",
+        })
 
         (
           so.Plot(corrs,
