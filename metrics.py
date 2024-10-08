@@ -205,6 +205,7 @@ class EmpiricalDifficultyHNSW(object):
         assert distances.shape[0] > k
 
         def tester(efsearch):
+            print("efsearch: ", efsearch)
             # we need to lock the execution because the statistics collection is
             # not thread safe, in that it uses global variables.
             with FAISS_LOCK:
