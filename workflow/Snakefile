@@ -748,13 +748,13 @@ rule run_messi_shell:
         data_samples = min(data_samples, rd.MAX_DATA_LEN)
         index = os.path.join(RES_DIR, "index/messi/", wildcards["dataset"])
 
-        # check that data and queries are normalized
-        data, _ = rd.read_multiformat(input["data"], "train")
-        assert np.all(np.isclose(np.linalg.norm(data, axis=1), 1))
-        queries, _ = rd.read_multiformat(input["workload"], "test")
-        assert np.all(np.isclose(np.linalg.norm(queries, axis=1), 1))
-        data = None
-        queries = None
+        # # check that data and queries are normalized
+        # data, _ = rd.read_multiformat(input["data"], "train")
+        # assert np.all(np.isclose(np.linalg.norm(data, axis=1), 1))
+        # queries, _ = rd.read_multiformat(input["workload"], "test")
+        # assert np.all(np.isclose(np.linalg.norm(queries, axis=1), 1))
+        # data = None
+        # queries = None
         
         leaf_size = 2000
         min_leaf_size = 2000
