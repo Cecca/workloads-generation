@@ -77,7 +77,7 @@ def _file_based_workloads():
         ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
         ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
         ("sald-128-100m", "sald-128-1k"),
-        # TODO: add synthetic ?
+        # # TODO: add synthetic ?
         ("rw-256-100m", "rw-256-1k"),
         ("astro-256-100m", "astro-256-1k"),
         ("deep1b-96-100m", "deep1b-96-1k"),
@@ -354,21 +354,21 @@ def workloads():
     configs.extend(empirical_configs[0])
     workloads_dict.update(empirical_configs[1])
 
-    annealing_configs = _annealing_workloads()
-    configs.extend(annealing_configs[0])
-    workloads_dict.update(annealing_configs[1])
-
-    sgd_configs = _sgd_workloads()
-    configs.extend(sgd_configs[0])
-    workloads_dict.update(sgd_configs[1])
-
-    noise_configs = _gaussian_noise_workloads()
-    configs.extend(noise_configs[0])
-    workloads_dict.update(noise_configs[1])
-
-    file_configs = _file_based_workloads()
-    configs.extend(file_configs[0])
-    workloads_dict.update(file_configs[1])
+    # annealing_configs = _annealing_workloads()
+    # configs.extend(annealing_configs[0])
+    # workloads_dict.update(annealing_configs[1])
+    #
+    # sgd_configs = _sgd_workloads()
+    # configs.extend(sgd_configs[0])
+    # workloads_dict.update(sgd_configs[1])
+    #
+    # noise_configs = _gaussian_noise_workloads()
+    # configs.extend(noise_configs[0])
+    # workloads_dict.update(noise_configs[1])
+    #
+    # file_configs = _file_based_workloads()
+    # configs.extend(file_configs[0])
+    # workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 

@@ -106,50 +106,44 @@ rule generate_workload:
         #logging.basicConfig(level=logging.INFO)
         logging.basicConfig(level=logging.DEBUG)
 
-        only_new = True
-
         workload_config = WORKLOADS.config_for( wildcards["workload_key"] )
         workload_type = workload_config["workload_type"]
         if workload_type == "synthetic-simulated-annealing":
-            if not only_new:
-                generate.generate_workload_annealing(
-                  input[0],
-                  output["workload"],
-                  k = int(workload_config['k']),
-                  metric = workload_config["difficulty"],
-                  target_class = workload_config['target_class'],
-                  num_queries = int(workload_config['num_queries']),
-                  threads = threads,
-                  max_rounds = "return-any"
-                )
+            generate.generate_workload_annealing(
+              input[0],
+              output["workload"],
+              k = int(workload_config['k']),
+              metric = workload_config["difficulty"],
+              target_class = workload_config['target_class'],
+              num_queries = int(workload_config['num_queries']),
+              threads = threads,
+              max_rounds = "return-any"
+            )
         elif workload_type == "synthetic-sgd":
-            if not only_new:
-                generate.generate_workload_sgd(
-                  input[0],
-                  output[0],
-                  k = int(workload_config['k']),
-                  target_class = workload_config['target_class'],
-                  num_queries = int(workload_config['num_queries']),
-                  threads = threads,
-                )
+            generate.generate_workload_sgd(
+              input[0],
+              output[0],
+              k = int(workload_config['k']),
+              target_class = workload_config['target_class'],
+              num_queries = int(workload_config['num_queries']),
+              threads = threads,
+            )
         elif workload_type == "synthetic-gaussian-noise":
-            if not only_new:
-                print("generating with gaussian noise", workload_config)
-                generate.generate_workload_gaussian_noise(
-                    input[0],
-                    output["workload"],
-                    num_queries=workload_config["num_queries"],
-                    scale=workload_config["scale"],
-                )
+            print("generating with gaussian noise", workload_config)
+            generate.generate_workload_gaussian_noise(
+                input[0],
+                output["workload"],
+                num_queries=workload_config["num_queries"],
+                scale=workload_config["scale"],
+            )
         elif workload_type == "file-based":
-            if not only_new:
-                print("linking file-based workload")
-                os.symlink(
-                  os.path.abspath(
-                    os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
-                  ),
-                  output["workload"]
-                )
+            print("linking file-based workload")
+            os.symlink(
+              os.path.abspath(
+                os.path.join(DATA_DIR, workload_config["queries_filename"]) + ".bin"
+              ),
+              output["workload"]
+            )
         elif workload_type == "empirical-difficulty-based":
             print("generating targeting empirical difficulty", workload_config)
             generate.generate_workload_empirical_difficulty(
@@ -163,18 +157,13 @@ rule generate_workload:
                 max_steps=1000,
                 threads = threads,
             )
-            print("Saving the ground truth")
-            dataset, distance_metric = read_data.read_multiformat(input[0], "train")
-            queryset, _ = read_data.read_multiformat(output["workload"], "test")
-            utils.save_ground_truth(dataset, queryset, distance_metric, output["ground"])
         else:
             raise ValueError(f"unknown workload type {workload_type}")
 
-        # FIXME: re-enable this
-        #print("Saving the ground truth")
-        #dataset, distance_metric = read_data.read_multiformat(input[0], "train")
-        #queryset, _ = read_data.read_multiformat(output["workload"], "test")
-        #utils.save_ground_truth(dataset, queryset, distance_metric, output["ground"])
+        print("Saving the ground truth")
+        dataset, distance_metric = read_data.read_multiformat(input[0], "train")
+        queryset, _ = read_data.read_multiformat(output["workload"], "test")
+        utils.save_ground_truth(dataset, queryset, distance_metric, output["ground"])
 
 
 # And finally here we compute the metrics of the synthetic
