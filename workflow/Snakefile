@@ -1184,6 +1184,8 @@ rule paper_all:
     input:
         "paper/index-table-k10.tex",
         "paper/index-table-k1.tex",
+        "paper/index-k10.png",
+        "paper/index-k1.png",
         "paper/actual_relative_contrasts_k10.png",
         "paper/actual_relative_contrasts_k1.png",
         "paper/actual_lid_k10.png",
@@ -1237,6 +1239,12 @@ rule paper_index_table:
         tab = tab.reset_index(["method", "difficulty"]).pivot(columns=["method", "difficulty"], values="distcomp")
         tab.to_latex(output[0], float_format="%.5f", column_format="ll|r|rrr|rrr|rrr")
         #tab.to_latex(output[0], float_format="%.1e")
+
+
+rule paper_index_plot:
+    input: "results_nefeli/metrics/index-performance.csv"
+    output: "paper/index-k{k}.png"
+    script: "plots/paper_index_plot.py"
 
 
 rule paper_actual_relative_contrasts:
