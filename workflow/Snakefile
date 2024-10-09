@@ -1192,9 +1192,11 @@ rule paper_all:
         "paper/actual_lid_k1.png",
         "paper/correlations_rc_10.png",
         "paper/correlations_exp_20|10.png",
-    #"paper/correlations_eps_0.5.png",
-    #"paper/correlations_eps_0.05.png",
-    #"paper/correlations-bars.png",
+        "paper/correlations_lid_10.png",
+        "paper/correlations_eps_1.png",
+        "paper/correlations_eps_0.5.png",
+        "paper/correlations_eps_0.05.png",
+        #"paper/correlations-bars.png",
 
 
 rule paper_index_table:
@@ -1325,13 +1327,12 @@ rule paper_correlations_specific:
         df = df[df["dataset"] != "fashion_mnist"]
 
         # remove outliers
-        if metric in ["rc_10", "exp_20|10"]:
-            q = df[metric].quantile(0.99)
-            df = df[df[metric] < q]
+        #if metric in ["rc_10", "exp_20|10", "lid_10", "eps_1"]:
+        q = df[metric].quantile(0.99)
+        df = df[df[metric] < q]
 
         def quantizer(group, column="rc_10"):
             group = group[group[column] >= 0]
-            print(group)
             nbins = 100
             group["binned_col"] = pd.cut(group[column], nbins)
             group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)

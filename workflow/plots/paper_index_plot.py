@@ -19,7 +19,7 @@ perf["difficulty"] = perf["difficulty"].fillna("-")
 perf["method"] = perf["method"].str.replace("File", "Baseline")
 perf["method"] = perf["method"].str.replace("Annealing", "Hephaestus-Annealing")
 perf["method"] = perf["method"].str.replace("SGD", "Hephaestus-Gradient")
-perf = perf[perf["difficulty"] != "hard"]
+perf = perf[perf["difficulty"] != "hard+"]
 perf["difficulty"] = perf["difficulty"].str.replace("+", "")
 
 perf["difficulty"] = pd.Categorical(
