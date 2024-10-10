@@ -308,7 +308,7 @@ def _empirical_difficulty_workloads():
         "seismic-256-100m",
         "rw-256-100m",
     ]
-    targets = [(0.5, 0.6), (0.1, 0.2)]
+    targets = [(0.1, 0.2)]
     num_queries = [10]
     k_values = [1]
     indices = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"]
