@@ -1196,7 +1196,7 @@ rule paper_all:
         "paper/correlations_eps_1.png",
         "paper/correlations_eps_0.5.png",
         "paper/correlations_eps_0.05.png",
-        #"paper/correlations-bars.png",
+        "paper/correlations-bars.png",
 
 
 rule paper_index_table:
@@ -1334,7 +1334,10 @@ rule paper_correlations_specific:
         def quantizer(group, column="rc_10"):
             group = group[group[column] >= 0]
             nbins = 100
-            group["binned_col"] = pd.cut(group[column], nbins)
+            try:
+                group["binned_col"] = pd.qcut(group[column], 100)
+            except:
+                group["binned_col"] = pd.cut(group[column], 100)
             group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
             return group
 
@@ -1415,7 +1418,10 @@ rule paper_correlations_bars:
 
         def quantizer(group, column="rc_10"):
             group = group[np.isfinite(group[column])].copy()
-            group["binned_col"] = pd.cut(group[column], 100)
+            try:
+                group["binned_col"] = pd.qcut(group[column], 100)
+            except:
+                group["binned_col"] = pd.cut(group[column], 100)
             group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
             return group
 
