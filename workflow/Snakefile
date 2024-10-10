@@ -247,7 +247,7 @@ rule plot_difficulty:
 
 rule convergence_plot:
     input:
-        os.path.join(RES_DIR, "convergence", "all.csv")
+        os.path.join("results_nefeli", "convergence", "all.csv")
     output:
         os.path.join("paper", "convergence.png")
     run:
@@ -264,6 +264,7 @@ rule convergence_plot:
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
         df["method"] = df["method"].str.replace("sgd", "Hephaestus-Gradient")
         df["method"] = df["method"].str.replace("annealing", "Hephaestus-Annealing")
+        df = df[df["dataset"] != "fashion_mnist"]
 
         def panel_plot(data, **kwargs):
             for qidx in data["query_index"].unique():
@@ -279,6 +280,7 @@ rule convergence_plot:
             col="dataset",
             col_wrap=4,
             hue="method",
+            legend_out=False,
             sharex=False,
             sharey=False,
             aspect=1.5,
@@ -287,8 +289,12 @@ rule convergence_plot:
         g.set_xlabels("Elapsed time (s)")
         g.set_ylabels("Relative contrast")
         g.map_dataframe(panel_plot)
-        g.add_legend()
-        g.tight_layout()
+        legend_labels, legend_handles = zip(* list( g._legend_data.items() ) )
+        print(legend_labels, legend_handles)
+        legend_ax = g.facet_axis(0,6)
+        legend_ax.legend(handles=legend_handles, labels=legend_labels, loc="center left",
+                         bbox_to_anchor=(1.2,0.5))
+        #g.tight_layout()
         g.savefig(output[0])
 
 
