@@ -3,11 +3,18 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from icecream import ic
 from generate import generate_query_sgd
-import logging
 
 
 def simulate(
-    n=30, k=1, outpath="example.png", seed=1234, with_legend=False, with_generate=False, target=1.4, delta=0.1
+    n=30,
+    k=1,
+    outpath="example.png",
+    seed=1234,
+    with_legend=False,
+    with_generate=False,
+    target=1.4,
+    delta=0.1,
+    annotate=None,
 ):
     assert k > 0
     gen = np.random.default_rng(seed)
@@ -36,7 +43,7 @@ def simulate(
             assert rc > 1
             rcs[i, j] = rc
 
-    plt.figure(figsize=(5,5))
+    plt.figure(figsize=(5, 5))
     plt.imshow(
         rcs.T, norm=LogNorm(), origin="lower", extent=(min_x, max_x, min_y, max_y)
     )
@@ -51,32 +58,54 @@ def simulate(
             # ticks = [1, 100, 200, 300, 400, 500, 600]
         )
     if with_generate:
-        ic(rcs.min(), rcs.max())
         path = generate_query_sgd(
             points,
             "euclidean",
             k=k,
-            target_low=target-delta,
-            target_high=target+delta,
+            target_low=target - delta,
+            target_high=target + delta,
             return_intermediate=True,
-            start_point=np.array([
-                min_x + ( max_x - min_x ) / 2,
-                min_y + ( max_y - min_y ) / 2,
-            ]),
+            start_point=np.array(
+                [
+                    min_x + (max_x - min_x) / 2,
+                    min_y + (max_y - min_y) / 2,
+                ]
+            ),
             learning_rate=0.5,
-            seed=1458
+            seed=1458,
         )
-        plt.scatter(path[-1,0], path[-1,1], c="white")
-        plt.scatter(path[1:,0], path[1:,1], c="white", s=5)
+        plt.scatter(path[-1, 0], path[-1, 1], c="white")
+        plt.scatter(path[1:, 0], path[1:, 1], c="white", s=5)
         plt.plot(path[:, 0], path[:, 1], c="white")
+
+    if annotate is not None:
+        dists = np.linalg.norm(points - np.array(annotate), axis=1)
+        dists = np.sort(dists)
+        nearest = dists[k - 1]  # .min()
+        rc = dists.mean() / nearest
+        ic(rc)
+        if rc > 2:
+            color="white"
+        else:
+            color="black"
+        plt.scatter(annotate[0], annotate[1], c=color, marker="x", s=100)
 
     plt.axis("off")
     plt.tight_layout(pad=0)
     plt.savefig(outpath)
 
 
-simulate(outpath="example-k1.png", with_generate=True, target=8)
-simulate(k=10, outpath="example-k10.png", with_generate=True, target=1.04, delta=0.01)
-simulate(outpath="example-k1-nopath.png", with_generate=False, target=8)
-simulate(k=10, outpath="example-k10-nopath.png", with_generate=False, target=1.04, delta=0.01)
-
+# simulate(outpath="example-k1.png", with_generate=True, target=8)
+# simulate(k=10, outpath="example-k10.png", with_generate=True, target=1.04, delta=0.01)
+marker = (3.47, 2.72)
+simulate(
+    outpath="example-k1-nopath.png", with_generate=False, target=8, annotate=marker
+)
+simulate(
+    k=10,
+    outpath="example-k10-nopath.png",
+    with_generate=False,
+    target=1.04,
+    delta=0.01,
+    annotate=marker,
+)
