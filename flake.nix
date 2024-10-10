@@ -42,6 +42,7 @@
             jupyter-console
             radian
             faiss
+            networkx
           ]) ++
           (with pkgs.rPackages; [
             tidyverse

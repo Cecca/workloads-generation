@@ -1409,154 +1409,155 @@ rule sota_distcomps:
         index_perf = os.path.join("results_nefeli", "metrics","index-performance.csv"),
     output:
         main = os.path.join("paper", "sota-distcomps.png"),
-        legend = os.path.join("paper", "sota-distcomps-legend.png")
-    run:
-        import matplotlib
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-        import seaborn as sns
-        import seaborn.objects as so
-        import pandas as pd
-        import numpy as np
-
-        df = pd.read_csv(input["index_perf"])
-        df = df[df["k"] == 10]
-        df = df[df["workload"].str.startswith("File")]
-        df = df[df["index_name"] != "messi_apprx"]
-        df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
-        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
-        ndatasets = len( df["dataset"].unique() )
-        n_indices = len( df["index_name"].unique() )
-
-        colors = ["#113238","#418D64","#E2E062"]
-
-        def doplot(data, ax=None):
-            if ax is None:
-                ax = plt.gca()
-            ptiles = np.percentile(data, [2.5, 10, 25, 75, 90, 97.5])
-            median = np.median(data)
-            print("median is", median, "percentiles", ptiles)
-            sns.kdeplot(
-                data,
-                ax=ax,
-                color="gray",
-                edgecolor="gray",
-                fill=True,
-                cut=0,
-                zorder=100
-            )
-            ylim = ax.get_ylim()
-            print("ylim", ylim)
-
-            #ax.hist(subset["distcomp"], bins=100, color="lightgray")
-            miny, maxy = ( -0.5 * ylim[1] ), (-0.05 * ylim[1])
-            #ax.scatter(median, ylim[1]/2, zorder=200, color="red")
-            ax.axvline(median, zorder=200, color="red")
-            ax.text(
-                median + (1 if median < 0.5 else -1) * 0.02,
-                ylim[1],
-                "%.4f" % (median),
-                zorder=200,
-                color="black",
-                ha = "left" if median < 0.5 else "right",
-                va="top"
-            )
-            ax.fill_between([ptiles[0], ptiles[5]], miny, maxy, color=colors[2])
-            ax.fill_between([ptiles[1], ptiles[4]], miny, maxy, color=colors[1])
-            ax.fill_between([ptiles[2], ptiles[3]], miny, maxy, color=colors[0])
-            ax.set_xlim((0, 1))
-
-
-        fig, axs = plt.subplots(nrows=ndatasets, ncols=4, figsize=(10, 4))
-
-        for i, dataset in enumerate( sorted( df["dataset"].unique() ) ):
-            for j, index in enumerate(df["index_name"].unique()):
-                ax = axs[i][j]
-                subset = df[(df["dataset"] == dataset) & (df["index_name"] == index)]
-                doplot(subset["distcomp"], ax=ax)
-
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-                if i == 0:
-                    ax.set_title("index: {}".format(index))
-                if i < ndatasets - 1:
-                    ax.spines["bottom"].set_visible(False)
-                    ax.get_xaxis().set_visible(False)
-                ax.set_xlabel("")
-                if j == 0:
-                    ax.set_ylabel(dataset, rotation=0, ha="right")
-                    ax.set_yticks([])
-                else:
-                    ax.get_yaxis().set_visible(False)
-                ax.spines["left"].set_visible(False)
-
-
-        axs[-1][1].set_xlabel("fraction of distance computations")
-
-        plt.tight_layout(pad=0)
-        plt.savefig(output["main"], dpi=300)
-
-        # LEGEND
-        plt.figure(figsize=(3, 2))
-
-        datalegend = np.random.default_rng(1234).exponential(0.3, size=1000)
-        datalegend = datalegend[(datalegend > 0) & (datalegend < 1)]
-
-        doplot(datalegend)
-        ax = plt.gca()
-        ax.set_axis_off()
-
-        yoff = -3
-        ax.annotate(
-            "50% of the\ndistance computations\nfall in this range", 
-            (0.22, -1.25),
-            (0.15, yoff),
-            arrowprops=dict(
-                #width=.5,
-                color="k",
-                arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
-                connectionstyle="arc3,rad=.3"
-            ),
-            ha="center", 
-            va="top"
-        )
-        ax.annotate(
-            "80%",
-            (0.5, -1.25),
-            (0.5, yoff),
-            arrowprops=dict(
-                color="k",
-                arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
-                connectionstyle="arc3,rad=.3"
-            ),
-            ha="center", 
-            va="top"
-        )
-        ax.annotate(
-            "95%",
-            (0.75, -1.25),
-            (0.75, yoff),
-            arrowprops=dict(
-                color="k",
-                arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
-                connectionstyle="arc3,rad=.3"
-            ),
-            ha="center", 
-            va="top"
-        )
-        ax.annotate(
-            "median",
-            (0.45, 2.3),
-            (0.75, 2),
-            arrowprops=dict(
-                color="k",
-                arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
-                connectionstyle="arc3,rad=.3"
-            ),
-            ha="center", 
-            va="top"
-        )
-        ax.text(0.0, 2.8, "Legend", color="gray", size=13)
-
-        plt.tight_layout(pad=0)
-        plt.savefig(output["legend"], dpi=300)
+        #legend = os.path.join("paper", "sota-distcomps-legend.png")
+    script: "plots/sota_distcomps.py"
+    #run:
+    #   import matplotlib
+    #   matplotlib.use("Agg")
+    #   from matplotlib import pyplot as plt
+    #   import seaborn as sns
+    #   import seaborn.objects as so
+    #   import pandas as pd
+    #   import numpy as np
+    #
+    #   df = pd.read_csv(input["index_perf"])
+    #   df = df[df["k"] == 10]
+    #   df = df[df["workload"].str.startswith("File")]
+    #   df = df[df["index_name"] != "messi_apprx"]
+    #   df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
+    #   df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+    #   ndatasets = len( df["dataset"].unique() )
+    #   n_indices = len( df["index_name"].unique() )
+    #
+    #   colors = ["#113238","#418D64","#E2E062"]
+    #
+    #   def doplot(data, ax=None):
+    #       if ax is None:
+    #           ax = plt.gca()
+    #       ptiles = np.percentile(data, [2.5, 10, 25, 75, 90, 97.5])
+    #       median = np.median(data)
+    #       print("median is", median, "percentiles", ptiles)
+    #       sns.kdeplot(
+    #           data,
+    #           ax=ax,
+    #           color="gray",
+    #           edgecolor="gray",
+    #           fill=True,
+    #           cut=0,
+    #           zorder=100
+    #       )
+    #       ylim = ax.get_ylim()
+    #       print("ylim", ylim)
+    #
+    #       #ax.hist(subset["distcomp"], bins=100, color="lightgray")
+    #       miny, maxy = ( -0.5 * ylim[1] ), (-0.05 * ylim[1])
+    #       #ax.scatter(median, ylim[1]/2, zorder=200, color="red")
+    #       ax.axvline(median, zorder=200, color="red")
+    #       ax.text(
+    #           median + (1 if median < 0.5 else -1) * 0.02,
+    #           ylim[1],
+    #           "%.4f" % (median),
+    #           zorder=200,
+    #           color="black",
+    #           ha = "left" if median < 0.5 else "right",
+    #           va="top"
+    #       )
+    #       ax.fill_between([ptiles[0], ptiles[5]], miny, maxy, color=colors[2])
+    #       ax.fill_between([ptiles[1], ptiles[4]], miny, maxy, color=colors[1])
+    #       ax.fill_between([ptiles[2], ptiles[3]], miny, maxy, color=colors[0])
+    #       ax.set_xlim((0, 1))
+    #
+    #
+    #   fig, axs = plt.subplots(nrows=ndatasets, ncols=4, figsize=(10, 4))
+    #
+    #   for i, dataset in enumerate( sorted( df["dataset"].unique() ) ):
+    #       for j, index in enumerate(df["index_name"].unique()):
+    #           ax = axs[i][j]
+    #           subset = df[(df["dataset"] == dataset) & (df["index_name"] == index)]
+    #           doplot(subset["distcomp"], ax=ax)
+    #
+    #           ax.spines["top"].set_visible(False)
+    #           ax.spines["right"].set_visible(False)
+    #           if i == 0:
+    #               ax.set_title("index: {}".format(index))
+    #           if i < ndatasets - 1:
+    #               ax.spines["bottom"].set_visible(False)
+    #               ax.get_xaxis().set_visible(False)
+    #           ax.set_xlabel("")
+    #           if j == 0:
+    #               ax.set_ylabel(dataset, rotation=0, ha="right")
+    #               ax.set_yticks([])
+    #           else:
+    #               ax.get_yaxis().set_visible(False)
+    #           ax.spines["left"].set_visible(False)
+    #
+    #
+    #   axs[-1][1].set_xlabel("fraction of distance computations")
+    #
+    #   plt.tight_layout(pad=0)
+    #   plt.savefig(output["main"], dpi=300)
+    #
+    #   # LEGEND
+    #   plt.figure(figsize=(3, 2))
+    #
+    #   datalegend = np.random.default_rng(1234).exponential(0.3, size=1000)
+    #   datalegend = datalegend[(datalegend > 0) & (datalegend < 1)]
+    #
+    #   doplot(datalegend)
+    #   ax = plt.gca()
+    #   ax.set_axis_off()
+    #
+    #   yoff = -3
+    #   ax.annotate(
+    #       "50% of the\ndistance computations\nfall in this range", 
+    #       (0.22, -1.25),
+    #       (0.15, yoff),
+    #       arrowprops=dict(
+    #           #width=.5,
+    #           color="k",
+    #           arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
+    #           connectionstyle="arc3,rad=.3"
+    #       ),
+    #       ha="center", 
+    #       va="top"
+    #   )
+    #   ax.annotate(
+    #       "80%",
+    #       (0.5, -1.25),
+    #       (0.5, yoff),
+    #       arrowprops=dict(
+    #           color="k",
+    #           arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
+    #           connectionstyle="arc3,rad=.3"
+    #       ),
+    #       ha="center", 
+    #       va="top"
+    #   )
+    #   ax.annotate(
+    #       "95%",
+    #       (0.75, -1.25),
+    #       (0.75, yoff),
+    #       arrowprops=dict(
+    #           color="k",
+    #           arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
+    #           connectionstyle="arc3,rad=.3"
+    #       ),
+    #       ha="center", 
+    #       va="top"
+    #   )
+    #   ax.annotate(
+    #       "median",
+    #       (0.45, 2.3),
+    #       (0.75, 2),
+    #       arrowprops=dict(
+    #           color="k",
+    #           arrowstyle="Simple, tail_width=0.01, head_width=.5, head_length=.5",
+    #           connectionstyle="arc3,rad=.3"
+    #       ),
+    #       ha="center", 
+    #       va="top"
+    #   )
+    #   ax.text(0.0, 2.8, "Legend", color="gray", size=13)
+    #
+    #   plt.tight_layout(pad=0)
+    #   plt.savefig(output["legend"], dpi=300)
