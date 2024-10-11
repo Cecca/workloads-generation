@@ -311,7 +311,8 @@ def _empirical_difficulty_workloads():
     targets = [(0.1, 0.2)]
     num_queries = [10]
     k_values = [1]
-    indices = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"]
+    indices = ["messi"]
+    # indices = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"]
 
     for dataset, k, nq, index in product(datasets, k_values, num_queries, indices):
         for target_low, target_high in targets:
