@@ -1,71 +1,141 @@
-,dataset,workload,query_index,index_name,index_params,time_s,distcomp,recall,k
-0,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",0,messi,,,0.1980618733703192,1.0,1
-1,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",1,messi,,,0.1862242440731584,1.0,1
-2,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",2,messi,,,0.1128951579786973,1.0,1
-3,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",3,messi,,,0.1695915722162982,1.0,1
-4,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",4,messi,,,0.1539635357080693,1.0,1
-5,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",5,messi,,,0.1430342184376357,1.0,1
-6,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",6,messi,,,0.1641366304074138,1.0,1
-7,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",7,messi,,,0.1688404192937303,1.0,1
-8,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",8,messi,,,0.1066797688916227,1.0,1
-9,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",9,messi,,,0.1063029250182084,1.0,1
-0,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",0,messi,,,0.1563909566849921,1.0,1
-1,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",1,messi,,,0.1412060284165225,1.0,1
-2,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",2,messi,,,0.1979769534202325,1.0,1
-3,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",3,messi,,,0.4191247269301251,1.0,1
-4,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",4,messi,,,0.1989743271178661,1.0,1
-5,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",5,messi,,,0.1197918284379195,1.0,1
-6,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",6,messi,,,0.148518951825815,1.0,1
-7,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",7,messi,,,0.1567740310117648,1.0,1
-8,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",8,messi,,,0.9973150285925296,1.0,1
-9,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",9,messi,,,0.1646391336308199,1.0,1
-0,sald-128-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1573904,1.0,1
-1,sald-128-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1288452,1.0,1
-2,sald-128-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.1281004,1.0,1
-3,sald-128-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1690012,1.0,1
-4,sald-128-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1601292,1.0,1
-5,sald-128-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1014984,1.0,1
-6,sald-128-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1852694,1.0,1
-7,sald-128-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1490026,1.0,1
-8,sald-128-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1432528,1.0,1
-9,sald-128-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1105642,1.0,1
-0,astro-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1063356,1.0,1
-1,astro-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1706908,1.0,1
-2,astro-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.171442,1.0,1
-3,astro-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1143768,1.0,1
-4,astro-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.8137836,1.0,1
-5,astro-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1645422,1.0,1
-6,astro-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.169727,1.0,1
-7,astro-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1866008,1.0,1
-8,astro-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1043264,1.0,1
-9,astro-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.9430234,1.0,1
-0,deep1b-96-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1232052,1.0,1
-1,deep1b-96-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1378284,1.0,1
-2,deep1b-96-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.1185086,1.0,1
-3,deep1b-96-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.151219,1.0,1
-4,deep1b-96-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1060104,1.0,1
-5,deep1b-96-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1275766,1.0,1
-6,deep1b-96-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1031952,1.0,1
-7,deep1b-96-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1432212,1.0,1
-8,deep1b-96-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1278924,1.0,1
-9,deep1b-96-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1074246,1.0,1
-0,seismic-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1191268,1.0,1
-1,seismic-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1950676,1.0,1
-2,seismic-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.126646,1.0,1
-3,seismic-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1244262,1.0,1
-4,seismic-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1753644,1.0,1
-5,seismic-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1340498,1.0,1
-6,seismic-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1780784,1.0,1
-7,seismic-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1382298,1.0,1
-8,seismic-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1552078,1.0,1
-9,seismic-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.4122844,1.0,1
-0,rw-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1444658,1.0,1
-1,rw-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1194074,1.0,1
-2,rw-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.146457,1.0,1
-3,rw-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1854104,1.0,1
-4,rw-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1810626,1.0,1
-5,rw-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.143314,1.0,1
-6,rw-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1526648,1.0,1
-7,rw-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1527698,1.0,1
-8,rw-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.156971,1.0,1
-9,rw-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1893204,1.0,1
+,dataset,workload,query_index,index_name,index_params,time_s,distcomp,recall,k,target_recall
+0,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",0,messi,,,0.1980618733703192,1.0,1,
+1,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",1,messi,,,0.1862242440731584,1.0,1,
+2,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",2,messi,,,0.1128951579786973,1.0,1,
+3,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",3,messi,,,0.1695915722162982,1.0,1,
+4,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",4,messi,,,0.1539635357080693,1.0,1,
+5,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",5,messi,,,0.1430342184376357,1.0,1,
+6,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",6,messi,,,0.1641366304074138,1.0,1,
+7,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",7,messi,,,0.1688404192937303,1.0,1,
+8,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",8,messi,,,0.1066797688916227,1.0,1,
+9,glove-angular-104-1183514,"Empirical(messi,0.1,0.2)",9,messi,,,0.1063029250182084,1.0,1,
+0,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",0,messi,,,0.1563909566849921,1.0,1,
+1,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",1,messi,,,0.1412060284165225,1.0,1,
+2,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",2,messi,,,0.1979769534202325,1.0,1,
+3,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",3,messi,,,0.4191247269301251,1.0,1,
+4,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",4,messi,,,0.1989743271178661,1.0,1,
+5,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",5,messi,,,0.1197918284379195,1.0,1,
+6,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",6,messi,,,0.148518951825815,1.0,1,
+7,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",7,messi,,,0.1567740310117648,1.0,1,
+8,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",8,messi,,,0.9973150285925296,1.0,1,
+9,nytimes-angular-256-289761,"Empirical(messi,0.1,0.2)",9,messi,,,0.1646391336308199,1.0,1,
+0,sald-128-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1573904,1.0,1,
+1,sald-128-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1288452,1.0,1,
+2,sald-128-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.1281004,1.0,1,
+3,sald-128-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1690012,1.0,1,
+4,sald-128-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1601292,1.0,1,
+5,sald-128-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1014984,1.0,1,
+6,sald-128-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1852694,1.0,1,
+7,sald-128-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1490026,1.0,1,
+8,sald-128-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1432528,1.0,1,
+9,sald-128-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1105642,1.0,1,
+0,astro-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1063356,1.0,1,
+1,astro-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1706908,1.0,1,
+2,astro-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.171442,1.0,1,
+3,astro-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1143768,1.0,1,
+4,astro-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.8137836,1.0,1,
+5,astro-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1645422,1.0,1,
+6,astro-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.169727,1.0,1,
+7,astro-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1866008,1.0,1,
+8,astro-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1043264,1.0,1,
+9,astro-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.9430234,1.0,1,
+0,deep1b-96-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1232052,1.0,1,
+1,deep1b-96-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1378284,1.0,1,
+2,deep1b-96-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.1185086,1.0,1,
+3,deep1b-96-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.151219,1.0,1,
+4,deep1b-96-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1060104,1.0,1,
+5,deep1b-96-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1275766,1.0,1,
+6,deep1b-96-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1031952,1.0,1,
+7,deep1b-96-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1432212,1.0,1,
+8,deep1b-96-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1278924,1.0,1,
+9,deep1b-96-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1074246,1.0,1,
+0,seismic-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1191268,1.0,1,
+1,seismic-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1950676,1.0,1,
+2,seismic-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.126646,1.0,1,
+3,seismic-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1244262,1.0,1,
+4,seismic-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1753644,1.0,1,
+5,seismic-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.1340498,1.0,1,
+6,seismic-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1780784,1.0,1,
+7,seismic-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1382298,1.0,1,
+8,seismic-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.1552078,1.0,1,
+9,seismic-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.4122844,1.0,1,
+0,rw-256-100m,"Empirical(messi,0.1,0.2)",0,messi,,,0.1444658,1.0,1,
+1,rw-256-100m,"Empirical(messi,0.1,0.2)",1,messi,,,0.1194074,1.0,1,
+2,rw-256-100m,"Empirical(messi,0.1,0.2)",2,messi,,,0.146457,1.0,1,
+3,rw-256-100m,"Empirical(messi,0.1,0.2)",3,messi,,,0.1854104,1.0,1,
+4,rw-256-100m,"Empirical(messi,0.1,0.2)",4,messi,,,0.1810626,1.0,1,
+5,rw-256-100m,"Empirical(messi,0.1,0.2)",5,messi,,,0.143314,1.0,1,
+6,rw-256-100m,"Empirical(messi,0.1,0.2)",6,messi,,,0.1526648,1.0,1,
+7,rw-256-100m,"Empirical(messi,0.1,0.2)",7,messi,,,0.1527698,1.0,1,
+8,rw-256-100m,"Empirical(messi,0.1,0.2)",8,messi,,,0.156971,1.0,1,
+9,rw-256-100m,"Empirical(messi,0.1,0.2)",9,messi,,,0.1893204,1.0,1,
+0,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 222}",,0.1697580256760798,1.0,1,0.95
+1,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 244}",,0.1805149748967904,1.0,1,0.95
+2,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 240}",,0.1835745077793756,1.0,1,0.95
+3,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 168}",,0.1296849889397168,1.0,1,0.95
+4,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 182}",,0.1416527392155901,1.0,1,0.95
+5,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 150}",,0.1103062574671698,1.0,1,0.95
+6,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 170}",,0.1229474260549516,1.0,1,0.95
+7,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 234}",,0.1869331499247157,1.0,1,0.95
+8,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 230}",,0.1808377425193111,1.0,1,0.95
+9,glove-angular-104-1183514,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF1088,Flat"", ""nprobe"": 154}",,0.120074625226233,1.0,1,0.95
+0,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 44}",,0.1002136243317768,1.0,1,0.95
+1,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 72}",,0.1629825960015323,1.0,1,0.95
+2,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 64}",,0.1443499987921079,1.0,1,0.95
+3,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 48}",,0.1003206090536683,1.0,1,0.95
+4,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 54}",,0.1286784625950352,1.0,1,0.95
+5,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 60}",,0.1382208095637439,1.0,1,0.95
+6,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 64}",,0.1511901187530413,1.0,1,0.95
+7,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 46}",,0.1063807758808121,1.0,1,0.95
+8,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 86}",,0.1906053609699027,1.0,1,0.95
+9,nytimes-angular-256-289761,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF539,Flat"", ""nprobe"": 62}",,0.1465725201114021,1.0,1,0.95
+0,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 222}",,0.1105934,1.0,1,0.95
+1,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 216}",,0.1006874,1.0,1,0.95
+2,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 330}",,0.1503216,1.0,1,0.95
+3,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 356}",,0.1192648,1.0,1,0.95
+4,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 360}",,0.1058374,1.0,1,0.95
+5,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 24}",,0.0108358,1.0,1,0.95
+6,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 396}",,0.1456376,1.0,1,0.95
+7,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 188}",,0.100941,1.0,1,0.95
+8,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 300}",,0.1020336,1.0,1,0.95
+9,sald-128-100m,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 476}",,0.1384038,1.0,1,0.95
+0,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 386}",,0.1427258,1.0,1,0.95
+1,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 430}",,0.1828696,1.0,1,0.95
+2,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 178}",,0.0913128,1.0,1,0.95
+3,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 184}",,0.1000128,1.0,1,0.95
+4,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 322}",,0.1202882,1.0,1,0.95
+5,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 366}",,0.1617522,1.0,1,0.95
+6,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 268}",,0.1118116,1.0,1,0.95
+7,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 414}",,0.1640514,1.0,1,0.95
+8,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 22}",,0.0148468,1.0,1,0.95
+9,astro-256-100m,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 248}",,0.1175276,1.0,1,0.95
+0,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 192}",,0.100824,1.0,1,0.95
+1,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 410}",,0.1825024,1.0,1,0.95
+2,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 202}",,0.1008048,1.0,1,0.95
+3,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 274}",,0.1295272,1.0,1,0.95
+4,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 226}",,0.121329,1.0,1,0.95
+5,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 204}",,0.1025324,1.0,1,0.95
+6,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 272}",,0.1518518,1.0,1,0.95
+7,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 200}",,0.1001944,1.0,1,0.95
+8,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 198}",,0.1005556,1.0,1,0.95
+9,deep1b-96-100m,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 92}",,0.055422,1.0,1,0.95
+0,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 12}",,0.0045322,1.0,1,0.95
+1,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 102}",,0.0375216,1.0,1,0.95
+2,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 354}",,0.1220376,1.0,1,0.95
+3,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 38}",,0.0157548,1.0,1,0.95
+4,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 442}",,0.1578288,1.0,1,0.95
+5,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 126}",,0.0437182,1.0,1,0.95
+6,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 14}",,0.00558,1.0,1,0.95
+7,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 280}",,0.1011106,1.0,1,0.95
+8,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 86}",,0.028279,1.0,1,0.95
+9,seismic-256-100m,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 556}",,0.1994588,1.0,1,0.95
+0,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",0,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 432}",,0.1240182,1.0,1,0.95
+1,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",1,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 270}",,0.1059854,1.0,1,0.95
+2,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",2,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 492}",,0.1214592,1.0,1,0.95
+3,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",3,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 756}",,0.192432,1.0,1,0.95
+4,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",4,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 310}",,0.1343982,1.0,1,0.95
+5,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",5,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 218}",,0.1105712,1.0,1,0.95
+6,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",6,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 392}",,0.1279418,1.0,1,0.95
+7,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",7,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 402}",,0.1063148,1.0,1,0.95
+8,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",8,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 168}",,0.119868,1.0,1,0.95
+9,rw-256-100m,"Empirical(faiss_ivf,0.1,0.2)",9,faiss_ivf,"{""index_params"": ""IVF2237,Flat"", ""nprobe"": 178}",,0.1085048,1.0,1,0.95
