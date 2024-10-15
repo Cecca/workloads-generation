@@ -1385,7 +1385,7 @@ rule paper_correlations_bars:
         corrs["metric"] = corrs["metric"].replace({
           "lid_10": "$LID_{10}$",
           "rc_10": "$RC_{10}$",
-          "exp_20|10": "$Expansion_{20|10}$",
+          "exp_20|10": "$Exp_{20|10}$",
           "eps_0.05": r"$\alpha_{0.05, 10}$",
           "eps_0.1": r"$\alpha_{0.1, 10}$",
           "eps_0.5": r"$\alpha_{0.5, 10}$",
@@ -1399,7 +1399,7 @@ rule paper_correlations_bars:
                   color="sign")
             .facet(row="dataset")
             .add(so.Bars())
-            .layout(size=(8, 12))
+            .layout(size=(6, 10))
             .save(output[0])
         )
 

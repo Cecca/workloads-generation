@@ -50,7 +50,7 @@ remapping = {
     "eps_1": r"$\alpha_{1, 10}$",
 }
 
-g = sns.FacetGrid(df, col="dataset", sharex=True, sharey=True)
+g = sns.FacetGrid(df, col="dataset", sharex=True, sharey=True, height=2.2)
 g.set(yscale="log")
 g.set(xscale="log")
 g.set_axis_labels(x_var=remapping[metric],y_var="empirical hardness")
@@ -69,7 +69,7 @@ for (i, j, _), fdata in g.facet_data():
     if j == 0:
         ax.text(-0.3, 1.15, remapping[metric], transform=ax.transAxes, size=15)
     ax.text(xtext, 1, "$\\tau$=%.3f" % (corrs.loc[dataset]),
-            size=15,
+            size=10,
             transform=ax.transAxes, 
             ha=ha, 
             va="top",
