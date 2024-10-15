@@ -587,7 +587,8 @@ rule index_performance:
     input:
         [csv for csv in expand(
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
-            index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
+            index = ["dstree"],
+            #index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
             pattern = WORKLOADS.instance_patterns
         ) if "index" not in WORKLOADS.config_from_path(csv)
           or WORKLOADS.config_from_path(csv)["index"] in csv
@@ -902,17 +903,21 @@ rule run_dstree_shell:
 
 # grep -F 'Query_total_loaded_ts_count' {log}  | grep '1$' | cut  -f 2,4
 
-        res = []
-        for line_idx, log_line in enumerate(shell("grep -F 'Query_total_loaded_ts_count' {log}  | grep '1$' | cut  -f 2,4", read=True, iterable=True)):
+        res = dict()
+        for line_idx, log_line in enumerate(shell("grep -F 'Query_total_loaded_ts_count' {log} | cut  -f 2,4", read=True, iterable=True)):
             dists, q_idx = list(map(int, log_line.split()))
             # distcomp = dists + sax_rescale * sax_dist
             distcomp = dists 
             distcomp = distcomp / data_samples 
+            res[q_idx] = distcomp + res.get(q_idx, 0)
 
+
+        # TODO: make dataframe
+        entries = []
+        for q_idx, distcomp in res.items():
             alg_name = "dstree"
             recall = 1.0
-
-            res.append({
+            entries.append({
                 "dataset": wildcards["dataset"],
                 "workload": WORKLOADS.description_for(wildcards["workload_key"]),
                 "query_index": q_idx,
@@ -927,7 +932,7 @@ rule run_dstree_shell:
         except FileNotFoundError:
             pass
 
-        df = pd.DataFrame(res)
+        df = pd.DataFrame(entries)
         df.to_csv(output[0], index=False)
 
 rule run_faiss_hnsw:
