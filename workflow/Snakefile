@@ -1419,7 +1419,9 @@ rule sota_distcomps:
 
 
 rule empirical_workload_results:
-    input: "results_nefeli/metrics/index-performance-empirical.csv"
+    input:
+      index_perf = "results_nefeli/metrics/index-performance-empirical.csv",
+      metrics = "results_nefeli/metrics/all-metrics-empirical.csv"
     output: "paper/empirical-workload.png"
     script: "plots/empirical_workload_results.py"
 
