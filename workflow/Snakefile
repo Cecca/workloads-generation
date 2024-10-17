@@ -896,6 +896,7 @@ rule run_dstree_shell:
             --mode 1 \
             --timeseries-size {slength} \
             --k 1 \
+            --k {k} \
             --epsilon 0 \
             --delta 1 \
             > '{log}'")
