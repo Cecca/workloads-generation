@@ -1,3 +1,4 @@
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from icecream import ic
@@ -6,7 +7,14 @@ import pandas as pd
 k = int(snakemake.wildcards["k"])
 
 # read and clean data
+metrics = pd.read_csv(snakemake.input[1])[["i", "rc_10", "rc_1", "dataset", "workload_description"]]
+metrics = metrics.rename(columns={"workload_description": "workload", "i": "query_index"})
+metrics["k"] = np.where(metrics["rc_10"].isna(), 1, 10)
+metrics["rc"] = np.where(metrics["rc_10"].isna(), metrics["rc_1"], metrics["rc_10"])
+
+
 perf = pd.read_csv(snakemake.input[0])
+perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 perf = perf[perf["k"] == k]
 perf.rename(columns={"index_name": "index"}, inplace=True)
 perf.replace("File.*", "Baseline", regex=True, inplace=True)
@@ -43,19 +51,79 @@ perf = perf[perf["dataset"] != "fashion"]
 perf["index"] = pd.Categorical(
     perf["index"], categories=["MESSI", "DSTree", "IVF", "HNSW"], ordered=True
 )
+perf = perf[np.isfinite(perf["rc"])]
 
+perf = perf.groupby(["dataset", "index", "method", "difficulty"], as_index=False)[["rc", "distcomp"]].mean()
+# perf = perf[perf["rc"] < 10]
+perf["distcomp"] = np.minimum(perf["distcomp"], 1.0)
+print(perf[( perf["method"] == "GaussianNoise" ) & (perf["index"] == "DSTree")])
 
 def doplot(data, **kwargs):
     ax = sns.barplot(data, **kwargs)
-    # ax.bar_label(ax.containers[0], fontsize=10)
+
+
+def doscatter(data, **kwargs):
+    ax = sns.scatterplot(
+        data,
+        x="rc",
+        y="distcomp",
+        hue="method",
+        style="difficulty",
+        s=100,
+        palette="tab10"
+    )
+    sns.lineplot(
+        data,
+        x="rc",
+        y="distcomp",
+        hue="method",
+        # style="method",
+        linewidth=1,
+        palette="tab10"
+    )
+    xmax = data["rc"].max()
+    ic(xmax, data["dataset"].unique())
+    ticks = [1, round(xmax, 1)]
+    # ticks = [1,round(( xmax - 1 )/4 + 1, 1), round(( xmax - 1 )/2 + 1, 1), round(xmax, 1)]
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(ticks=ticks, labels=map(str, ticks))
+    ax.set_xticks(ticks=[], minor=True)
 
 
 g = sns.FacetGrid(
-    data=perf, col="dataset", row="index", sharex=False, legend_out=True, height=2.2,
+    data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
+    margin_titles=True
+)
+#g.set(xscale="log")
+g.map_dataframe(
+    doplot, x="distcomp", y="method", hue="difficulty", palette="tab10"#, errorbar=None
+)
+g.add_legend()
+g.savefig(snakemake.output[0])
+
+g = sns.FacetGrid(
+    data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
     margin_titles=True
 )
 g.map_dataframe(
-    doplot, x="distcomp", y="method", hue="difficulty", palette="tab10", errorbar=None
+    # sns.scatterplot,
+    doscatter,
+    x="rc",
+    y="distcomp",
+    hue="method",
+    # style="difficulty",
+    size="difficulty",
+    sizes=(100, 100),
+    palette="tab10"
 )
-g.add_legend(title="difficulty class")
-g.savefig(snakemake.output[0])
+g.add_legend()
+# # plt.tight_layout()
+# handles, labels = g.axes[0,0].get_legend_handles_labels()
+# handles = handles[:-4]
+# labels = labels[:-4]
+# ic(handles, labels)
+# g.axes[0,0].get_legend().remove()
+# g.figure.legend(handles, labels, ncol=2, loc='upper center', 
+#                 bbox_to_anchor=(0.5, 1.15), frameon=False)
+
+g.savefig(snakemake.output[1])
