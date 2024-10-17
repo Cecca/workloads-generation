@@ -100,7 +100,7 @@ def doscatter(data, **kwargs):
     )
     plt.text(
         x=1.27,
-        y=0.2,
+        y=0.21,
         s="Hephaestus-Annealing",
         c="tab:green"
     )
@@ -146,6 +146,8 @@ def doscatter(data, **kwargs):
     # ax.set_xscale("log", base=2)
     ax.set_xticks(ticks=ticks, labels=map(str, ticks))
     ax.set_xticks(ticks=[], minor=True)
+    ax.set_xlabel("Relative contrast")
+    ax.set_xlabel("Empirical hardness")
 
 
 g = sns.FacetGrid(
@@ -155,7 +157,8 @@ g = sns.FacetGrid(
     sharex=False,
     sharey=True,
     legend_out=True,
-    height=2*2.2,
+    height=1.3*2.2,
+    aspect=2,
     margin_titles=True,
 )
 g.map_dataframe(
@@ -171,4 +174,6 @@ g.map_dataframe(
 )
 # g.add_legend()
 
-g.savefig(snakemake.output[0])
+g.set_xlabels("Relative contrast")
+g.set_ylabels("Empirical hardness")
+g.savefig(snakemake.output[0], dpi=300)
