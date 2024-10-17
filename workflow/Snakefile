@@ -879,7 +879,7 @@ rule run_dstree_shell:
                 --dataset-size {data_samples} \
                 --buffer-size 19531 \
                 --leaf-size 1000 \
-                --index-path '{index}' \
+                --index-path {index} \
                 --ascii-input 0 \
                 --mode 0 \
                 --timeseries-size {slength} ")
@@ -891,7 +891,7 @@ rule run_dstree_shell:
             --queries-size {q_samples} \
             --buffer-size 19531 \
             --leaf-size 1000 \
-            --index-path '{index}' \
+            --index-path {index} \
             --ascii-input 0 \
             --mode 1 \
             --timeseries-size {slength} \
@@ -1255,9 +1255,24 @@ rule paper_index_table:
 
 
 rule paper_index_plot:
-    input: "results_nefeli/metrics/index-performance.csv"
-    output: "paper/index-k{k}.png"
+    input:
+      "results_nefeli/metrics/index-performance.csv",
+      "results_nefeli/metrics/all-metrics.csv",
+      "results_nefeli/metrics/index-performance-dstree-gaussian.csv",
+    output: 
+      "paper/index-k{k}.png",
+      "paper/index-k{k}-scatter.png"
     script: "plots/paper_index_plot.py"
+
+
+rule paper_index_plot_focus:
+    input:
+      "results_nefeli/metrics/index-performance.csv",
+      "results_nefeli/metrics/all-metrics.csv",
+      "results_nefeli/metrics/index-performance-dstree-gaussian.csv",
+    output: 
+      "paper/index-focus.png",
+    script: "plots/paper_index_plot_focus.py"
 
 
 rule paper_actual_relative_contrasts:
