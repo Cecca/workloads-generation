@@ -14,6 +14,7 @@ def simulate(
     with_generate=False,
     target=1.4,
     delta=0.1,
+    start=None,
     annotate=None,
 ):
     assert k > 0
@@ -58,6 +59,15 @@ def simulate(
             # ticks = [1, 100, 200, 300, 400, 500, 600]
         )
     if with_generate:
+        if start is None:
+            start = np.array(
+                [
+                    min_x + (max_x - min_x) / 2,
+                    min_y + (max_y - min_y) / 2,
+                ]
+            )
+            ic(start)
+
         path = generate_query_sgd(
             points,
             "euclidean",
@@ -65,17 +75,20 @@ def simulate(
             target_low=target - delta,
             target_high=target + delta,
             return_intermediate=True,
-            start_point=np.array(
-                [
-                    min_x + (max_x - min_x) / 2,
-                    min_y + (max_y - min_y) / 2,
-                ]
-            ),
-            learning_rate=0.5,
+            start_point=start, 
+            learning_rate=0.4,
+            max_iter=3000,
             seed=1458,
         )
+        q = path[-1]
+        dists = np.linalg.norm(points - q, axis=1)
+        dists = np.sort(dists)
+        nearest = dists[k - 1]  # .min()
+        rc = dists.mean() / nearest
+        ic(path.shape)
+        ic(rc)
         plt.scatter(path[-1, 0], path[-1, 1], c="white")
-        plt.scatter(path[1:, 0], path[1:, 1], c="white", s=5)
+        # plt.scatter(path[1:, 0], path[1:, 1], c="white", s=5)
         plt.plot(path[:, 0], path[:, 1], c="white")
 
     if annotate is not None:
@@ -83,7 +96,7 @@ def simulate(
         dists = np.sort(dists)
         nearest = dists[k - 1]  # .min()
         rc = dists.mean() / nearest
-        ic(rc)
+        # ic(rc)
         if rc > 2:
             color="white"
         else:
@@ -98,14 +111,38 @@ def simulate(
 # simulate(outpath="example-k1.png", with_generate=True, target=8)
 # simulate(k=10, outpath="example-k10.png", with_generate=True, target=1.04, delta=0.01)
 marker = (3.47, 2.72)
+# simulate(
+#     outpath="example-k1-nopath.png", with_generate=False, target=8, annotate=marker
+# )
+# simulate(
+#     k=10,
+#     outpath="example-k10-nopath.png",
+#     with_generate=False,
+#     target=1.04,
+#     delta=0.01,
+#     annotate=marker,
+# )
+
+target = 2
+delta = 0.1
+start = (3.2, 7)
 simulate(
-    outpath="example-k1-nopath.png", with_generate=False, target=8, annotate=marker
+    outpath="example-k1-with-path.png",
+    with_generate=True,
+    target=8,
+    # target=target,
+    # delta=delta,
+    # start = start,
+    annotate=marker,
 )
 simulate(
     k=10,
-    outpath="example-k10-nopath.png",
-    with_generate=False,
+    outpath="example-k10-with-path.png",
+    with_generate=True,
+    # target = target,
+    # delta = delta,
     target=1.04,
     delta=0.01,
+    # start = start,
     annotate=marker,
 )
