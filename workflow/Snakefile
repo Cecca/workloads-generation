@@ -1258,6 +1258,7 @@ rule paper_index_plot:
     input:
       "results_nefeli/metrics/index-performance.csv",
       "results_nefeli/metrics/all-metrics.csv",
+      "results_nefeli/metrics/index-performance-dstree-gaussian.csv",
     output: 
       "paper/index-k{k}.png",
       "paper/index-k{k}-scatter.png"

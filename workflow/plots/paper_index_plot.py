@@ -12,8 +12,11 @@ metrics = metrics.rename(columns={"workload_description": "workload", "i": "quer
 metrics["k"] = np.where(metrics["rc_10"].isna(), 1, 10)
 metrics["rc"] = np.where(metrics["rc_10"].isna(), metrics["rc_1"], metrics["rc_10"])
 
+perf_dstree = pd.read_csv(snakemake.input[2])
 
 perf = pd.read_csv(snakemake.input[0])
+perf = perf[(~perf["workload"].str.startswith("Gaussian")) | (perf["index_name"] != "dstree")]
+perf = pd.concat([perf, perf_dstree])
 perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 perf = perf[perf["k"] == k]
 perf.rename(columns={"index_name": "index"}, inplace=True)
