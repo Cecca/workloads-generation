@@ -13,9 +13,10 @@ metrics["k"] = np.where(metrics["rc_10"].isna(), 1, 10)
 metrics["rc"] = np.where(metrics["rc_10"].isna(), metrics["rc_1"], metrics["rc_10"])
 
 perf_dstree = pd.read_csv(snakemake.input[2])
+print(perf_dstree)
 
 perf = pd.read_csv(snakemake.input[0])
-perf = perf[(~perf["workload"].str.startswith("Gaussian")) | (perf["index_name"] != "dstree")]
+perf = perf[( perf["index_name"] != "dstree" ) | (perf["workload"].str.startswith("File"))]
 perf = pd.concat([perf, perf_dstree])
 perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 perf = perf[perf["k"] == k]
