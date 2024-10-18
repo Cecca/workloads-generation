@@ -60,6 +60,9 @@ perf = perf[perf["dataset"] != "fashion"]
 # perf["index"] = pd.Categorical(
 #     perf["index"], categories=["MESSI", "DSTree", "IVF", "HNSW"], ordered=True
 # )
+perf["diffiulty"] = pd.Categorical(
+    perf["difficulty"], categories=["-","easy", "medium", "hard"], ordered=True
+)
 perf = perf[np.isfinite(perf["rc"])]
 
 perf = perf.groupby(["dataset", "index", "method", "difficulty"], as_index=False)[
@@ -80,6 +83,7 @@ def doscatter(data, **kwargs):
         y="distcomp",
         hue="method",
         style="difficulty",
+        markers=["P", "o", "s", "h"],
         s=100,
         palette="tab10",
     )
@@ -159,7 +163,7 @@ g = sns.FacetGrid(
     legend_out=True,
     height=1.3*2.2,
     aspect=2,
-    margin_titles=True,
+    margin_titles=False,
 )
 g.map_dataframe(
     # sns.scatterplot,

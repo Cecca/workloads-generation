@@ -96,7 +96,7 @@ def get_data():
     # df = pd.merge(df, selected_queries)
 
     difficult = pd.merge( df[df["distcomp"] <= 0.999], difficult_metrics ).iloc[-2:].copy()
-    difficult["label"] = "difficult"
+    difficult["label"] = "hard"
     ic(difficult)
 
     easy = pd.merge( df[df["distcomp"] < 0.15], easy_metrics ).iloc[-2:].copy()
