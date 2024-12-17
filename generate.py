@@ -39,6 +39,9 @@ def generate_queries_gaussian_noise(
     pts += noise
     if distance_metric == "angular":
         pts /= np.linalg.norm(pts, axis=1)[:, np.newaxis]
+    if distance_metric == "ip":
+        # reset the last element
+        pts[:,-1] = 0
 
     assert np.all(
         np.isfinite(pts)
@@ -126,6 +129,7 @@ def generate_queries_annealing(
     neighbor_generators = {
         "angular": neighbor_generator_angular(scale, gen),
         "euclidean": neighbor_generator_euclidean(scale, gen),
+        "ip": neighbor_generator_ip(scale, gen),
     }
     gen_neighbor = neighbor_generators[distance_metric]
 
@@ -197,6 +201,7 @@ def generate_queries_annealing(
                 neighbor_generators = {
                     "angular": neighbor_generator_angular(scale, gen),
                     "euclidean": neighbor_generator_euclidean(scale, gen),
+                    "ip": neighbor_generator_ip(scale, gen),
                 }
                 gen_neighbor = neighbor_generators[distance_metric]
 
@@ -441,11 +446,28 @@ def neighbor_generator_euclidean(scale, rng):
 
     return inner
 
+def neighbor_generator_ip(scale, rng):
+    def inner(x):
+        direction = rng.normal(size=x.shape[0]).astype(np.float32)
+        direction /= np.linalg.norm(direction)
+        amount = rng.exponential(scale=scale)
+        offset = direction * amount
+        neighbor = x + offset
+        neighbor[-1] = 0 # reset the last coordinate
+        # logging.debug("euclidean distance: %f", np.linalg.norm(x - neighbor))
+        return neighbor
 
-def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
+    return inner
+
+
+
+def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
+    logging.info("computing the average RC")
     gen = np.random.default_rng(seed)
     indices = gen.integers(data.shape[0], size=sample_size)
     qs = data[indices, :]
+    if distance_metric == "ip":
+        qs[:,-1] = 0
     data = np.delete(data, indices, axis=0)
     index = faiss.IndexFlatL2(data.shape[1])
     index.add(data)
@@ -454,7 +476,7 @@ def _average_rc(data, distance_metric, k, sample_size=1000, seed=1234):
     cnt = 0
     for qidx in range(sample_size):
         q = qs[qidx]
-        distances = utils.compute_distances(q, None, distance_metric, index)[0]
+        distances = utils.compute_distances(q, None, distance_metric, data)[0]
         knn_dist = distances[k]
         # discard the distances that are 0
         if knn_dist <= 0.0:
@@ -549,6 +571,13 @@ def _euclidean(x, dataset):
 
 
 @jax.jit
+def _embedded_ip(x, dataset):
+    assert x.shape[0] == dataset.shape[1] - 1
+    x = jnp.hstack((x, 0))
+    return jnp.linalg.norm(dataset - x, axis=1)
+
+
+@jax.jit
 def _angular(x, dataset):
     return 1 - jnp.dot(dataset, x)
 
@@ -576,6 +605,8 @@ def generate_query_sgd(
     assert target_low <= target_high
     if distance_metric == "euclidean":
         distance_fn = _euclidean
+    elif distance_metric == "ip":
+        distance_fn = _embedded_ip
     elif distance_metric == "angular":
         distance_fn = _angular
     else:
@@ -595,9 +626,12 @@ def generate_query_sgd(
         x = start_point + rng.normal(size=dataset.shape[1], scale=0.001)
     if distance_metric == "angular":
         x /= jnp.linalg.norm(x)
+    if distance_metric == "ip":
+        x = x[:-1]
     opt_state = optimizer.init(x)
 
     for i in range(max_iter):
+        ic(x.shape, dataset.shape[1])
         rc, grads = grad_fn(x, dataset, distance_fn, k)
         assert np.isfinite(rc)
         if return_intermediate:
@@ -645,15 +679,17 @@ def generate_query_sgd(
         x = optax.apply_updates(x, updates)
         if distance_metric == "angular":
             x /= jnp.linalg.norm(x)
+        if distance_metric == "ip":
+            assert x.shape[0] == dataset.shape[1] - 1
 
         assert np.all(np.isfinite(x))
 
     if return_intermediate:
         return np.stack(intermediate)
     if return_progress:
-        return x, progress
+        return np.hstack((x, 0)), progress
     else:
-        return x
+        return np.hstack((x, 0))
 
 
 def generate_queries_sgd(
@@ -808,6 +844,7 @@ def annealing_measure_convergence(
     neighbor_generators = {
         "angular": neighbor_generator_angular(scale, gen),
         "euclidean": neighbor_generator_euclidean(scale, gen),
+        "ip": neighbor_generator_ip(scale, gen),
     }
     gen_neighbor = neighbor_generators[distance_metric]
 
@@ -1042,15 +1079,13 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    generate_workload_empirical_difficulty(
-        # ".data/fashion-mnist-784-angular.hdf5",
-        ".data/fashion_mnist-angular-784-60K.bin",
-        # ".data/glove-25-angular.hdf5",
+    path = "/home/matteo/Dropbox/text2image-embedded.hdf5"
+    generate_workload_annealing(
+        path,
         "/tmp/queries.hdf5",
         k=10,
-        empirical_difficulty_range=(0.1, 0.5),
-        learning_rate=10.0,
-        index_name="dstree",
+        metric="rc",
+        target_class="easy",
         num_queries=1,
-        max_steps=1000
+        max_steps=10
     )

@@ -19,9 +19,12 @@ def compute_distances(queries, k, metric, data_or_index):
 
     The function applies the appropriate adjustments so that the output is:
 
-      - the Euclidean distance (not squared) is `metric="euclidean"`
+      - the Euclidean distance (not squared) if `metric="euclidean"`
       - the angular distance (i.e. 1 - dot(q,d), with q being the query
         and d a data point) if `metric="angular"`
+      - for the inner product similarity (metric="ip") the input is assumed to be
+        embedded with the classic embedding, and the euclidean distance is returned.
+        The assumption is asserted
 
     If `k` is None, then all distances are returned
     """
@@ -46,6 +49,16 @@ def compute_distances(queries, k, metric, data_or_index):
             dists = 1 - np.dot(queries, dataset.T)
         elif metric == "euclidean":
             dists = scipy.spatial.distance.cdist(queries, dataset)
+        elif metric == "ip":
+            assert np.allclose(
+                np.sqrt(1 - np.linalg.norm(dataset[:,:-1], axis=1)**2),
+                dataset[:,-1]
+            )
+            if queries.shape[1] == dataset.shape[1] - 1:
+                # The queries are not embedded, so we embed them on the fly
+                queries = np.c_[queries, np.zeros(queries.shape[0])]
+            assert np.all(queries[:,-1] == 0)
+            dists = scipy.spatial.distance.cdist(queries, dataset)
         else:
             raise RuntimeError("unknown distance" + metric)
         if k is not None:
@@ -58,6 +71,10 @@ def compute_distances(queries, k, metric, data_or_index):
         faiss_index = data_or_index
         if k is None:
             k = faiss_index.ntotal
+        if metric == "ip" and queries.shape[1] == faiss_index.d - 1:
+            # The queries are not embedded, so we embed them on the fly
+            queries = np.c_[queries, np.zeros(queries.shape[0])]
+
         dists = faiss_index.search(queries, k)[0]
         if metric == "angular":
             # The index returns squared euclidean distances,
@@ -65,6 +82,8 @@ def compute_distances(queries, k, metric, data_or_index):
             return 1 - (2 - dists) / 2
         elif metric == "euclidean":
             # The index returns the _squared_ euclidean distances
+            return np.sqrt(dists)
+        elif metric == "ip":
             return np.sqrt(dists)
         else:
             raise RuntimeError("unknown distance" + metric)
@@ -134,3 +153,14 @@ def count_within_distance(histogram_counts, histogram_edges, threshold):
     """Count how many points are within distance `threshold` using the given histogram counts and edges"""
     pos = np.searchsorted(histogram_edges, threshold)
     return np.sum(histogram_counts[: pos + 1])
+
+
+if __name__ == "__main__":
+    import read_data as rd
+    from icecream import ic
+    path = "/home/matteo/Dropbox/text2image-embedded.hdf5"
+    data, metric = rd.read_multiformat(path, "train")
+    queries, metric = rd.read_multiformat(path, "test")
+
+
+
