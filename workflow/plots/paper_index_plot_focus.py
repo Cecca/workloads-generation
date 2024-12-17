@@ -83,7 +83,7 @@ def doscatter(data, **kwargs):
         y="distcomp",
         hue="method",
         style="difficulty",
-        markers=["P", "o", "s", "h"],
+        markers=["P", "o", "^", "s"],
         s=100,
         palette="tab10",
     )
@@ -153,7 +153,6 @@ def doscatter(data, **kwargs):
     ax.set_xlabel("Relative contrast")
     ax.set_xlabel("Empirical hardness")
 
-
 g = sns.FacetGrid(
     data=perf,
     col="dataset",
@@ -162,7 +161,8 @@ g = sns.FacetGrid(
     sharey=True,
     legend_out=True,
     height=1.3*2.2,
-    aspect=2,
+    aspect=1.8,
+    # aspect=2,
     margin_titles=False,
 )
 g.map_dataframe(
@@ -176,7 +176,7 @@ g.map_dataframe(
     sizes=(100, 100),
     palette="tab10",
 )
-# g.add_legend()
+g.add_legend(label_order = ["-", "easy", "medium", "hard"])
 
 g.set_xlabels("Relative contrast")
 g.set_ylabels("Empirical hardness")
