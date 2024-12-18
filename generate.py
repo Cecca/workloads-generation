@@ -19,8 +19,10 @@ import logging
 import jax
 import jax.numpy as jnp
 import optax
+from cache import MEM
 
 
+@MEM.cache
 def generate_queries_gaussian_noise(
     dataset,
     distance_metric,
@@ -95,6 +97,7 @@ def _estimate_diameter(data, index, distance_metric):
     return distances[-1] * 2
 
 
+@MEM.cache
 def generate_queries_annealing(
     dataset,
     distance_metric,
@@ -692,6 +695,7 @@ def generate_query_sgd(
         return np.hstack((x, 0))
 
 
+@MEM.cache
 def generate_queries_sgd(
     dataset,
     distance_metric,

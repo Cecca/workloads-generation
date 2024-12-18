@@ -272,6 +272,7 @@ class EmpiricalDifficultyDSTree(object):
 
 
 
+@MEM.cache
 def metrics_csv(
     dataset_path,
     queries_path,
