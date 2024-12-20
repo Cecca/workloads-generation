@@ -587,8 +587,8 @@ rule index_performance:
     input:
         [csv for csv in expand(
             os.path.join(RES_DIR, "metrics/{index}/{pattern}/results.csv"),
-            index = ["dstree"],
-            #index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
+            # index = ["dstree"],
+            index = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"],
             pattern = WORKLOADS.instance_patterns
         ) if "index" not in WORKLOADS.config_from_path(csv)
           or WORKLOADS.config_from_path(csv)["index"] in csv

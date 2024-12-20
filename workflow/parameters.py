@@ -70,18 +70,14 @@ def _file_based_workloads():
 
     workload_type = "file-based"
     dataset_query_pairs = [
-        # (
-        #     "fashion_mnist-angular-784-60K",
-        #     "queries_fashion_mnist-angular-784-10000",
-        # ),
-        ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
-        ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
-        ("sald-128-100m", "sald-128-1k"),
-        # # TODO: add synthetic ?
-        ("rw-256-100m", "rw-256-1k"),
-        ("astro-256-100m", "astro-256-1k"),
-        ("deep1b-96-100m", "deep1b-96-1k"),
-        ("seismic-256-100m", "seismic-256-1k"),
+        # ("glove-angular-104-1183514", "queries_glove-angular-104-10000"),
+        # ("nytimes-angular-256-289761", "queries_nytimes-angular-256-9991"),
+        # ("sald-128-100m", "sald-128-1k"),
+        # ("rw-256-100m", "rw-256-1k"),
+        # ("astro-256-100m", "astro-256-1k"),
+        # ("deep1b-96-100m", "deep1b-96-1k"),
+        # ("seismic-256-100m", "seismic-256-1k"),
+        ("text2image-ip-208-10M.bin", "queries_text2image-ip-208-10K.bin"),
     ]
     k_values = [10, 1]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -118,14 +114,14 @@ def _sgd_workloads():
     workloads_dict = dict()
 
     datasets = [
-        # "fashion_mnist-angular-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
-        "rw-256-100m",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
+        # "rw-256-100m",
+        "text2image-ip-208-10M",
     ]
 
     # Stochastic gradient descent
@@ -184,14 +180,16 @@ def _annealing_workloads():
         # "nytimes-angular-256-289761",
         #"sald-128-1000000",
         # "fashion_mnist-angular-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
-        "rw-256-100m",
-    ]
+
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
+        # "rw-256-100m",
+        "text2image-ip-208-10M",
+,    ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
@@ -245,13 +243,14 @@ def _gaussian_noise_workloads():
 
     datasets = [
         # "fashion_mnist-angular-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
-        "rw-256-100m",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
+        # "rw-256-100m",
+        "text2image-ip-208-10M",
     ]
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]
@@ -299,14 +298,14 @@ def _empirical_difficulty_workloads():
 
     workload_type = "empirical-difficulty-based"
     datasets = [
-        # "fashion_mnist-angular-784-60K",
-        "glove-angular-104-1183514",
-        "nytimes-angular-256-289761",
-        "sald-128-100m",
-        "astro-256-100m",
-        "deep1b-96-100m",
-        "seismic-256-100m",
-        "rw-256-100m",
+        # "glove-angular-104-1183514",
+        # "nytimes-angular-256-289761",
+        # "sald-128-100m",
+        # "astro-256-100m",
+        # "deep1b-96-100m",
+        # "seismic-256-100m",
+        # "rw-256-100m",
+        "text2image-ip-208-10M",
     ]
     targets = [(0.1, 0.2)]
     num_queries = [10]
@@ -351,25 +350,25 @@ def workloads():
     configs = []
     workloads_dict = dict()
 
-    # empirical_configs = _empirical_difficulty_workloads()
-    # configs.extend(empirical_configs[0])
-    # workloads_dict.update(empirical_configs[1])
+    empirical_configs = _empirical_difficulty_workloads()
+    configs.extend(empirical_configs[0])
+    workloads_dict.update(empirical_configs[1])
 
-    # annealing_configs = _annealing_workloads()
-    # configs.extend(annealing_configs[0])
-    # workloads_dict.update(annealing_configs[1])
-    #
-    # sgd_configs = _sgd_workloads()
-    # configs.extend(sgd_configs[0])
-    # workloads_dict.update(sgd_configs[1])
-    #
+     annealing_configs = _annealing_workloads()
+     configs.extend(annealing_configs[0])
+     workloads_dict.update(annealing_configs[1])
+    
+     sgd_configs = _sgd_workloads()
+     configs.extend(sgd_configs[0])
+     workloads_dict.update(sgd_configs[1])
+    
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
     workloads_dict.update(noise_configs[1])
     
-    # file_configs = _file_based_workloads()
-    # configs.extend(file_configs[0])
-    # workloads_dict.update(file_configs[1])
+    file_configs = _file_based_workloads()
+    configs.extend(file_configs[0])
+    workloads_dict.update(file_configs[1])
 
     return WorkloadPatterns(configs, workloads_dict)
 

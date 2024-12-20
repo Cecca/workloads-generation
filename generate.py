@@ -30,7 +30,7 @@ def generate_queries_gaussian_noise(
     scale,
     seed=1234,
 ):
-    assert distance_metric in ["angular", "euclidean"]
+    assert distance_metric in ["angular", "euclidean", "ip"]
     # multiply by the scale so that different scales with the same seed are not scaled versions of the same noise
     gen = np.random.default_rng(int(seed * scale))
     starting_ids = gen.choice(
@@ -97,7 +97,6 @@ def _estimate_diameter(data, index, distance_metric):
     return distances[-1] * 2
 
 
-@MEM.cache
 def generate_queries_annealing(
     dataset,
     distance_metric,
