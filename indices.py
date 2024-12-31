@@ -61,7 +61,14 @@ class MessiWrapper(object):
 
         assert os.path.isfile(executable)
         self._executable = executable
-        if os.path.isfile(data):
+        if hasattr(data, "shape"):
+            # This is a Numpy array
+            if max_samples is not None and max_samples < data.shape[0]:
+                data = data[:max_samples,:]
+            self._data_path = MessiWrapper._write_bin_file(data)
+            self._features = data.shape[1]
+            self._samples = data.shape[0]
+        elif os.path.isfile(data):
             self._data_path = data
             _, features, samples, _ = rd.parse_filename(self._data_path)
             self._features = features
@@ -69,11 +76,7 @@ class MessiWrapper(object):
             if max_samples is not None and max_samples < samples:
                 self._samples = samples
         else:
-            if max_samples is not None and max_samples < data.shape[0]:
-                data = data[:max_samples,:]
-            self._data_path = MessiWrapper._write_bin_file(data)
-            self._features = data.shape[1]
-            self._samples = data.shape[0]
+            raise ValueError("Unsupported data type")
 
         self.leaf_size = leaf_size
         self.min_leaf_size = min_leaf_size
@@ -159,7 +162,14 @@ class DSTreeWrapper(object):
 
         assert os.path.isfile(executable)
         self._executable = executable
-        if os.path.isfile(data):
+        if hasattr(data, "shape"):
+            # This is Numpy array
+            if max_samples is not None and max_samples < data.shape[0]:
+                data = data[:max_samples,:]
+            self._data_path = MessiWrapper._write_bin_file(data)
+            self._features = data.shape[1]
+            self._samples = data.shape[0]
+        elif os.path.isfile(data):
             self._data_path = data
             _, features, samples, _ = rd.parse_filename(self._data_path)
             self._features = features
@@ -167,11 +177,7 @@ class DSTreeWrapper(object):
             if max_samples is not None and max_samples < samples:
                 self._samples = samples
         else:
-            if max_samples is not None and max_samples < data.shape[0]:
-                data = data[:max_samples,:]
-            self._data_path = MessiWrapper._write_bin_file(data)
-            self._features = data.shape[1]
-            self._samples = data.shape[0]
+            raise ValueError("Unsupported data type")
 
         self._index_file_name = self._get_index_file_name(data)
 
