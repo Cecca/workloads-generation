@@ -694,7 +694,7 @@ def generate_query_sgd(
         return np.hstack((x, 0))
 
 
-@MEM.cache
+#@MEM.cache
 def generate_queries_sgd(
     dataset,
     distance_metric,
