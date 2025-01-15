@@ -46,9 +46,11 @@ def get_text2image(data_dir, data_out_fname, queries_out_fname, seed=1234, num_q
     test_raw = test_raw[test_idxs,:]
 
     train_norms = np.linalg.norm(train_raw, axis=1)
-    train_emb = np.c_[train_raw, np.sqrt(1 - train_norms**2)]
-    test_emb = np.c_[test_raw, np.zeros(test_raw.shape[0])]
+    train_emb = np.c_[train_raw, np.sqrt(1 - train_norms**2)].astype(np.float32)
+    test_emb = np.c_[test_raw, np.zeros(test_raw.shape[0])].astype(np.float32)
     ic(train_emb.shape, test_emb.shape)
+    ic(test_emb[0])
+    ic(test_emb.dtype)
 
     _, n, dims, metric = read_data.parse_filename(data_out_fname)
     assert (n, dims) == train_emb.shape
@@ -56,6 +58,7 @@ def get_text2image(data_dir, data_out_fname, queries_out_fname, seed=1234, num_q
     _, n, dims, metric = read_data.parse_filename(queries_out_fname)
     assert (n, dims) == test_emb.shape
     assert metric == "ip"
+    assert np.all(test_emb[:,-1] == 0)
 
     train_emb.tofile(data_out_fname)
     test_emb.tofile(queries_out_fname)
