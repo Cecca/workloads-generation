@@ -77,7 +77,7 @@ def _file_based_workloads():
         # ("astro-256-100m", "astro-256-1k"),
         # ("deep1b-96-100m", "deep1b-96-1k"),
         # ("seismic-256-100m", "seismic-256-1k"),
-        ("text2image-ip-208-10M.bin", "queries_text2image-ip-208-10K.bin"),
+        ("text2image-ip-208-10M", "queries_text2image-ip-208-1K"),
     ]
     k_values = [10, 1]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -189,7 +189,7 @@ def _annealing_workloads():
         # "seismic-256-100m",
         # "rw-256-100m",
         "text2image-ip-208-10M",
-,    ]
+    ]
 
     # Simulated annealing synthetic queries
     workload_type = "synthetic-simulated-annealing"
@@ -310,7 +310,8 @@ def _empirical_difficulty_workloads():
     targets = [(0.1, 0.2)]
     num_queries = [10]
     k_values = [1]
-    indices = ["messi", "faiss_ivf", "faiss_hnsw"]
+    indices = ["faiss_ivf", "faiss_hnsw"]
+    # indices = ["messi", "faiss_ivf", "faiss_hnsw"]
     # indices = ["messi", "faiss_hnsw", "faiss_ivf", "dstree"]
 
     for dataset, k, nq, index in product(datasets, k_values, num_queries, indices):
@@ -354,13 +355,13 @@ def workloads():
     configs.extend(empirical_configs[0])
     workloads_dict.update(empirical_configs[1])
 
-     annealing_configs = _annealing_workloads()
-     configs.extend(annealing_configs[0])
-     workloads_dict.update(annealing_configs[1])
+    annealing_configs = _annealing_workloads()
+    configs.extend(annealing_configs[0])
+    workloads_dict.update(annealing_configs[1])
     
-     sgd_configs = _sgd_workloads()
-     configs.extend(sgd_configs[0])
-     workloads_dict.update(sgd_configs[1])
+    sgd_configs = _sgd_workloads()
+    configs.extend(sgd_configs[0])
+    workloads_dict.update(sgd_configs[1])
     
     noise_configs = _gaussian_noise_workloads()
     configs.extend(noise_configs[0])
