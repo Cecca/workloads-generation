@@ -213,7 +213,7 @@ class EmpiricalDifficultyHNSW(object):
                 self.index.hnsw.efSearch = efsearch
                 run_dists = compute_distances(x, k, self.distance_metric, self.index)[0]
                 stats = faiss.cvar.hnsw_stats
-                distcomp = stats.n1 + stats.n2 + stats.n3 + stats.ndis
+                distcomp = stats.ndis
 
             rec = compute_recall(distances, run_dists, k)
             if rec >= self.recall:
