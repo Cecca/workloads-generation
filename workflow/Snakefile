@@ -1186,7 +1186,7 @@ rule convert_annbench_to_bin:
 rule get_text2image:
     output:
         data = os.path.join(DATA_DIR, "text2image-ip-208-10M.bin"),
-        queries = os.path.join(DATA_DIR, "queries_text2image-ip-208-10K.bin")
+        queries = os.path.join(DATA_DIR, "queries_text2image-ip-208-1K.bin")
     script: "scripts/get_text2image.py"
         
 
