@@ -21,7 +21,7 @@ def read_fbin(filename, start_idx=0, chunk_size=None):
     return arr.reshape(nvecs, dim)
 
 
-def get_text2image(data_dir, data_out_fname, queries_out_fname, seed=1234, num_queries=10000):
+def get_text2image(data_dir, data_out_fname, queries_out_fname, seed=1234, num_queries=1000):
     data_dir = Path(data_dir)
     train_raw_path = data_dir / "text2image-10M.fbin" 
     read_data.download(
