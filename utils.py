@@ -106,7 +106,6 @@ def compute_recall(ground_distances, run_distances, count, epsilon=1e-3):
 HISTOGRAM_BINS = 1000
 
 
-@MEM.cache
 def save_ground_truth(dataset, queries, distance_metric, path, maxk=10000):
     """Compute the `maxk` nearest neighbors of the given queries on the given dataset.
     Saves a npz file containing the distances, the average
