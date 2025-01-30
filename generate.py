@@ -1082,13 +1082,14 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.DEBUG)
 
-    path = "/home/matteo/Dropbox/text2image-embedded.hdf5"
-    generate_workload_annealing(
+    path = ".data/text2image-ip-208-10M.bin"
+    generate_workload_empirical_difficulty(
         path,
         "/tmp/queries.hdf5",
+        empirical_difficulty_range=(0.1,0.2),
         k=10,
-        metric="rc",
-        target_class="easy",
+        index_name="messi",
         num_queries=1,
-        max_steps=10
+        learning_rate=10.0,
+        max_steps=1000
     )

@@ -5,6 +5,7 @@ import numpy as np
 from threading import Lock
 from icecream import ic
 import subprocess as sp
+import logging
 
 
 # This lock protects the accesses to faiss global performance counters
@@ -101,12 +102,14 @@ class MessiWrapper(object):
         """Run the given queries through the index and collect statistics about the execution"""
         import subprocess as sp
 
+        logging.debug("Writing queries to file")
         queries = np.array(queries)
         if len(queries.shape) == 1:
             queries = queries.reshape(1, -1)
         qpath = self._write_bin_file(queries)
         q_samples = queries.shape[0]
 
+        logging.debug("Calling MESSI")
         proc = sp.run([str(a) for a in [
             self._executable,
             "--dataset", self._data_path,
@@ -131,6 +134,7 @@ class MessiWrapper(object):
             print(proc.stderr.decode())
             proc.check_returncode()
         output = proc.stdout.decode("utf-8")
+        logging.debug("MESSI executed successfully")
 
         res = []
         for log_line in output.splitlines():
