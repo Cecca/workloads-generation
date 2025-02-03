@@ -201,12 +201,14 @@ class DSTreeWrapper(object):
         import hashlib
         import os
 
-        if os.path.isfile(data):
-            return data + ".dstree"
-        else:
+        if hasattr(data, "shape"):
             key = hashlib.sha256(np.array(data).data.tobytes()).hexdigest()
             path = os.path.join("/tmp", key + ".dstree")
             return path
+        elif os.path.isfile(data):
+            return data + ".dstree"
+        else:
+            raise ValueError("Unsupported data type")
 
     @staticmethod
     def _write_bin_file(data):
