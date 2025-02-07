@@ -22,7 +22,6 @@ import optax
 from cache import MEM
 
 
-@MEM.cache
 def generate_queries_gaussian_noise(
     dataset,
     distance_metric,
@@ -623,13 +622,13 @@ def generate_query_sgd(
     rng = np.random.default_rng(seed)
     optimizer = optax.adam(learning_rate)
     if start_point is None:
-        x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1])
+        x = dataset[rng.integers(dataset.shape[1]-1)] + rng.normal(size=dataset.shape[1], scale=0.001)
     else:
         x = start_point + rng.normal(size=dataset.shape[1], scale=0.001)
     if distance_metric == "angular":
         x /= jnp.linalg.norm(x)
     if distance_metric == "ip":
-        x = x[:-1]
+        x[-1] = 0
     opt_state = optimizer.init(x)
 
     for i in range(max_iter):
@@ -650,7 +649,7 @@ def generate_query_sgd(
             score = scoring_function(x)
         else:
             score = rc
-        logging.debug(
+        logging.info(
             "[%d] rc=%.4f score=%.4f (target range [%.4f, %.4f])",
             i,
             rc,
@@ -682,7 +681,7 @@ def generate_query_sgd(
         if distance_metric == "angular":
             x /= jnp.linalg.norm(x)
         if distance_metric == "ip":
-            assert x.shape[0] == dataset.shape[1] - 1
+            x = x.at[-1].set(0)
 
         assert np.all(np.isfinite(x))
 
@@ -1080,9 +1079,13 @@ def generate_workload_empirical_difficulty(
 
 if __name__ == "__main__":
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     path = ".data/text2image-ip-208-10M.bin"
+    path = ".data/text2image-euclidean-200-10M.bin"
+    path = ".data/text2image-angular-200-10M.bin"
+
+
     generate_workload_empirical_difficulty(
         path,
         "/tmp/queries.hdf5",
@@ -1090,6 +1093,7 @@ if __name__ == "__main__":
         k=10,
         index_name="messi",
         num_queries=1,
-        learning_rate=10.0,
-        max_steps=1000
-    )
+        learning_rate=0.01,
+        max_steps=1000,
+        threads=1
+   )

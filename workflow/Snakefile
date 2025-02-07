@@ -151,7 +151,7 @@ rule generate_workload:
                 output["workload"],
                 k=int(workload_config["k"]),
                 empirical_difficulty_range=(workload_config["target_low"], workload_config["target_high"]),
-                learning_rate=1.0,
+                learning_rate=0.01,
                 index_name=workload_config["index"],
                 num_queries=workload_config["num_queries"],
                 max_steps=1000,
