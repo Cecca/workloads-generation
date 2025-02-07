@@ -64,10 +64,100 @@ def get_text2image(data_dir, data_out_fname, queries_out_fname, seed=1234, num_q
     test_emb.tofile(queries_out_fname)
 
 
+def get_text2image_normalized(data_dir, data_out_fname, queries_out_fname, seed=1234, num_queries=1000):
+    data_dir = Path(data_dir)
+    train_raw_path = data_dir / "text2image-10M.fbin" 
+    read_data.download(
+        "https://storage.yandexcloud.net/yandex-research/ann-datasets/T2I/base.10M.fbin",
+        train_raw_path
+    )
+    test_raw_path = data_dir / "text2image-queries-100k.fbin"
+    read_data.download(
+        "https://storage.yandexcloud.net/yandex-research/ann-datasets/T2I/query.public.100K.fbin",
+        test_raw_path
+    )
+    train_raw = read_fbin(train_raw_path)
+    ic(train_raw.shape)
+    test_raw = read_fbin(test_raw_path)
+
+    # train_padding = np.zeros((train_raw.shape[0], 8), dtype=np.float32)
+    # test_padding = np.zeros((test_raw.shape[0], 7), dtype=np.float32)
+    # train_raw = np.hstack([train_raw, train_padding])
+    # test_raw = np.hstack([test_raw, test_padding])
+
+    rng = np.random.default_rng(seed)
+    test_idxs = rng.choice(np.arange(test_raw.shape[0]), num_queries)
+    test_raw = test_raw[test_idxs,:]
+
+    train = train_raw / np.linalg.norm(train_raw, axis=1)[:,np.newaxis]
+    test = test_raw / np.linalg.norm(test_raw, axis=1)[:,np.newaxis]
+
+    _, n, dims, metric = read_data.parse_filename(data_out_fname)
+    assert (n, dims) == train.shape
+    assert metric == "angular"
+    _, n, dims, metric = read_data.parse_filename(queries_out_fname)
+    assert (n, dims) == test.shape
+    assert metric == "angular"
+
+    train.tofile(data_out_fname)
+    test.tofile(queries_out_fname)
+
+
+def get_text2image_euclidean(data_dir, data_out_fname, queries_out_fname, seed=1234, num_queries=1000):
+    data_dir = Path(data_dir)
+    train_raw_path = data_dir / "text2image-10M.fbin" 
+    read_data.download(
+        "https://storage.yandexcloud.net/yandex-research/ann-datasets/T2I/base.10M.fbin",
+        train_raw_path
+    )
+    test_raw_path = data_dir / "text2image-queries-100k.fbin"
+    read_data.download(
+        "https://storage.yandexcloud.net/yandex-research/ann-datasets/T2I/query.public.100K.fbin",
+        test_raw_path
+    )
+    train_raw = read_fbin(train_raw_path)
+    ic(train_raw.shape)
+    test_raw = read_fbin(test_raw_path)
+
+    # train_padding = np.zeros((train_raw.shape[0], 8), dtype=np.float32)
+    # test_padding = np.zeros((test_raw.shape[0], 7), dtype=np.float32)
+    # train_raw = np.hstack([train_raw, train_padding])
+    # test_raw = np.hstack([test_raw, test_padding])
+
+    rng = np.random.default_rng(seed)
+    test_idxs = rng.choice(np.arange(test_raw.shape[0]), num_queries)
+    test_raw = test_raw[test_idxs,:]
+
+    train = train_raw
+    test = test_raw
+
+    _, n, dims, metric = read_data.parse_filename(data_out_fname)
+    assert (n, dims) == train.shape
+    assert metric == "euclidean"
+    _, n, dims, metric = read_data.parse_filename(queries_out_fname)
+    assert (n, dims) == test.shape
+    assert metric == "euclidean"
+
+    train.tofile(data_out_fname)
+    test.tofile(queries_out_fname)
+
 data_dir = Path(snakemake.output["data"]).parent
 
-get_text2image(
-    data_dir,
-    snakemake.output["data"],
-    snakemake.output["queries"]
-)
+if "angular" in snakemake.output["data"]:
+    get_text2image_normalized(
+        data_dir,
+        snakemake.output["data"],
+        snakemake.output["queries"]
+    )
+elif "euclidean" in snakemake.output["data"]:
+    get_text2image_euclidean(
+        data_dir,
+        snakemake.output["data"],
+        snakemake.output["queries"]
+    )
+else:
+    get_text2image(
+        data_dir,
+        snakemake.output["data"],
+        snakemake.output["queries"]
+    )

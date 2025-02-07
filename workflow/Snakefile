@@ -1190,6 +1190,17 @@ rule get_text2image:
     script: "scripts/get_text2image.py"
         
 
+rule get_text2image_angular:
+    output:
+        data = os.path.join(DATA_DIR, "text2image-angular-200-10M.bin"),
+        queries = os.path.join(DATA_DIR, "queries_text2image-angular-200-1K.bin")
+    script: "scripts/get_text2image.py"
+
+rule get_text2image_euclidean:
+    output:
+        data = os.path.join(DATA_DIR, "text2image-euclidean-200-10M.bin"),
+        queries = os.path.join(DATA_DIR, "queries_text2image-euclidean-200-1K.bin")
+    script: "scripts/get_text2image.py"
 
 ######################################################################
 #
