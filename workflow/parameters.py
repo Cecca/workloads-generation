@@ -77,7 +77,7 @@ def _file_based_workloads():
         # ("astro-256-100m", "astro-256-1k"),
         # ("deep1b-96-100m", "deep1b-96-1k"),
         # ("seismic-256-100m", "seismic-256-1k"),
-        ("text2image-ip-208-10M", "queries_text2image-ip-208-1K"),
+        ("text2image-angular-200-10M", "queries_text2image-angular-200-1K"),
     ]
     k_values = [10, 1]
     for (dataset, queryset), k in product(dataset_query_pairs, k_values):
@@ -121,7 +121,7 @@ def _sgd_workloads():
         # "deep1b-96-100m",
         # "seismic-256-100m",
         # "rw-256-100m",
-        "text2image-ip-208-10M",
+        "text2image-angular-200-10M",
     ]
 
     # Stochastic gradient descent
@@ -188,7 +188,7 @@ def _annealing_workloads():
         # "deep1b-96-100m",
         # "seismic-256-100m",
         # "rw-256-100m",
-        "text2image-ip-208-10M",
+        "text2image-angular-200-10M",
     ]
 
     # Simulated annealing synthetic queries
@@ -250,7 +250,7 @@ def _gaussian_noise_workloads():
         # "deep1b-96-100m",
         # "seismic-256-100m",
         # "rw-256-100m",
-        "text2image-ip-208-10M",
+        "text2image-angular-200-10M",
     ]
     # scales = [0.1, 1.0, 10.0]
     scales = ["easy", "medium", "hard"]
@@ -305,7 +305,7 @@ def _empirical_difficulty_workloads():
         # "deep1b-96-100m",
         # "seismic-256-100m",
         # "rw-256-100m",
-        "text2image-ip-208-10M",
+        "text2image-angular-200-10M",
     ]
     targets = [(0.1, 0.2)]
     num_queries = [10]
