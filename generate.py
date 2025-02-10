@@ -462,6 +462,7 @@ def neighbor_generator_ip(scale, rng):
 
 
 
+@MEM.cache
 def _average_rc(data, distance_metric, k, sample_size=100, seed=1234):
     logging.info("computing the average RC")
     gen = np.random.default_rng(seed)
@@ -688,9 +689,9 @@ def generate_query_sgd(
     if return_intermediate:
         return np.stack(intermediate)
     if return_progress:
-        return np.hstack((x, 0)), progress
+        return x, progress
     else:
-        return np.hstack((x, 0))
+        return x
 
 
 #@MEM.cache
@@ -788,6 +789,7 @@ def generate_workload_sgd(
         }
         for future in tasks:
             query = future.result()
+            ic(query.shape)
             queries.append(query)
 
     queries = np.vstack(queries).astype(np.float32)
@@ -1086,14 +1088,12 @@ if __name__ == "__main__":
     path = ".data/text2image-angular-200-10M.bin"
 
 
-    generate_workload_empirical_difficulty(
+    generate_workload_sgd(
+    # generate_workload_empirical_difficulty(
         path,
         "/tmp/queries.hdf5",
-        empirical_difficulty_range=(0.1,0.2),
-        k=10,
-        index_name="messi",
-        num_queries=1,
-        learning_rate=0.01,
-        max_steps=1000,
+        target_class="hard",
+        k=1,
+        num_queries=10,
         threads=1
-   )
+    )
