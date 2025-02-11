@@ -1358,6 +1358,83 @@ rule paper_correlations_specific:
     script: "plots/paper_correlations_specific.py"
 
 
+rule paper_correlations_table:
+    input:
+        "results_nefeli/metrics/all-metrics.csv"
+    output:
+        "paper/correlations-table.tex",
+    run:
+        import pandas as pd
+        import numpy as np
+        import seaborn.objects as so
+        import matplotlib
+        import matplotlib.pyplot as plt
+
+        matplotlib.use("Agg")
+
+        plt.rcParams.update({
+            "text.usetex": True,
+            "font.family": "Helvetica"
+        })
+
+        df = pd.read_csv(input[0])
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df = df[df["dataset"] != "fashion_mnist"]
+        print(df)
+
+
+        def quantizer(group, column="rc_10"):
+            group = group[np.isfinite(group[column])].copy()
+            try:
+                group["binned_col"] = pd.qcut(group[column], 100)
+            except:
+                group["binned_col"] = pd.cut(group[column], 100)
+            group = group.groupby("binned_col", observed=True)[[column, "distcomp"]].mean().dropna().reset_index(drop=True)
+            return group
+
+
+        def quantize_by(df, column="rc_10"):
+            df = df.groupby("dataset").apply(quantizer, column, include_groups=False).reset_index()
+            del df["level_1"]
+            corrs = df.groupby("dataset").corr("kendall")["distcomp"].reset_index()
+            corrs = corrs[corrs["level_1"] != "distcomp"]
+            del corrs["level_1"]
+            corrs.set_index("dataset", inplace=True)
+            corrs.columns = [column]
+            return df, corrs
+
+        dfs = []
+        for metric in ["lid_10", "rc_10", "exp_20|10"] + ["eps_" + str(e) for e in [ 0.05, 0.1, 0.5, 1 ]]:
+            # remove outliers
+            if metric in ["rc_10", "exp_20|10"]:
+                q = df[metric].quantile(0.99)
+                ldf = df[df[metric] < q]
+            else:
+                ldf = df.copy()
+            _f, corrs = quantize_by(ldf, metric)
+            dfs.append(corrs)
+
+        corrs = dfs[0]
+        for df in dfs[1:]:
+            corrs = pd.merge(corrs, df, left_index=True, right_index=True)
+        corrs = corrs.stack().reset_index()
+        corrs.columns = ["dataset", "metric", "correlation"]
+        #corrs["sign"] = corrs["correlation"] > 0
+        corrs["correlation"] = np.abs( corrs["correlation"] )
+        corrs["metric"] = corrs["metric"].replace({
+          "lid_10": "$LID_{10}$",
+          "rc_10": "$RC_{10}$",
+          "exp_20|10": "$Exp_{20|10}$",
+          "eps_0.05": r"$\alpha_{0.05, 10}$",
+          "eps_0.1": r"$\alpha_{0.1, 10}$",
+          "eps_0.5": r"$\alpha_{0.5, 10}$",
+          "eps_1": r"$\alpha_{1, 10}$",
+        })
+        corrs = corrs.pivot(columns="dataset", index="metric")["correlation"]
+
+        corrs.style.format(precision=2).to_latex(output[0])
+
+
 rule paper_correlations_bars:
     input:
         "results_nefeli/metrics/all-metrics.csv"
