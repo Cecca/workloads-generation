@@ -1299,6 +1299,7 @@ rule paper_index_plot:
       "results_nefeli/metrics/index-performance-dstree-fixed.csv",
     output: 
       "paper/index-k{k}.png",
+      "paper/index-k{k}-selection.png",
       "paper/index-k{k}-scatter.png"
     script: "plots/paper_index_plot.py"
 
