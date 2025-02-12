@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from icecream import ic
 import pandas as pd
 
+SELECTION = ["astro", "deep1b", "glove", "sald"]
+
 k = int(snakemake.wildcards["k"])
 
 # read and clean data
@@ -105,12 +107,24 @@ g.map_dataframe(
 g.add_legend()
 g.savefig(snakemake.output[0])
 
+
+g = sns.FacetGrid(
+    data=perf[perf["dataset"].isin(SELECTION)],
+    col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2,
+    margin_titles=True
+)
+#g.set(xscale="log")
+g.map_dataframe(
+    doplot, x="distcomp", y="method", hue="difficulty", palette="tab10"#, errorbar=None
+)
+# g.add_legend()
+g.savefig(snakemake.output[1])
+
 g = sns.FacetGrid(
     data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
     margin_titles=True
 )
 g.map_dataframe(
-    # sns.scatterplot,
     doscatter,
     x="rc",
     y="distcomp",
@@ -121,13 +135,5 @@ g.map_dataframe(
     palette="tab10"
 )
 g.add_legend()
-# # plt.tight_layout()
-# handles, labels = g.axes[0,0].get_legend_handles_labels()
-# handles = handles[:-4]
-# labels = labels[:-4]
-# ic(handles, labels)
-# g.axes[0,0].get_legend().remove()
-# g.figure.legend(handles, labels, ncol=2, loc='upper center', 
-#                 bbox_to_anchor=(0.5, 1.15), frameon=False)
 
-g.savefig(snakemake.output[1])
+g.savefig(snakemake.output[2])
