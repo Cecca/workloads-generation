@@ -11,6 +11,8 @@ plt.rcParams.update({
 df = pd.read_csv(snakemake.input["index_perf"])
 #df = df[df["distcomp"] <= 0.2]
 df = df[df["index_name"] != "messi_apprx"]
+df = df[df["dataset"] != "text2image-angular-200-10M"]
+# df = df[df["dataset"] != ""]
 df["dataset"] = df["dataset"].str.replace(".*/", "", regex=True)
 df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
 df = df[df["dataset"] != "fashion_mnist"]
