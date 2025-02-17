@@ -8,7 +8,11 @@ matplotlib.use("Agg")
 
 metric = snakemake.wildcards["metric"]
 
-df = pd.read_csv(snakemake.input[0])
+df = pd.concat((
+    pd.read_csv(snakemake.input[0]),
+    pd.read_csv(snakemake.input[1])
+))
+df = df[df["dataset"] != "text2image-angular-200-10M"]
 df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
 df = df[df["dataset"] != "fashion_mnist"]
 

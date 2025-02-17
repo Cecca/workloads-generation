@@ -1375,7 +1375,7 @@ rule paper_actual_relative_contrasts:
         )
 
 rule paper_correlations_specific:
-    input: "results_nefeli/metrics/all-metrics.csv"
+    input: "results_nefeli/metrics/all-metrics.csv", "results_nefeli/metrics/all-metrics-text2image.csv"
     output: "paper/correlations_{metric}.png",
     script: "plots/paper_correlations_specific.py"
 
