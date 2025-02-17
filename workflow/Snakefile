@@ -1382,7 +1382,8 @@ rule paper_correlations_specific:
 
 rule paper_correlations_table:
     input:
-        "results_nefeli/metrics/all-metrics.csv"
+        "results_nefeli/metrics/all-metrics.csv",
+        "results_nefeli/metrics/all-metrics-text2image.csv",
     output:
         "paper/correlations-table.tex",
     run:
@@ -1391,6 +1392,7 @@ rule paper_correlations_table:
         import seaborn.objects as so
         import matplotlib
         import matplotlib.pyplot as plt
+        from pandas.api.types import is_numeric_dtype
 
         matplotlib.use("Agg")
 
@@ -1399,9 +1401,13 @@ rule paper_correlations_table:
             "font.family": "Helvetica"
         })
 
-        df = pd.read_csv(input[0])
+        df = pd.concat((
+            pd.read_csv(input[0]),
+            pd.read_csv(input[1]),
+        ))
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
         df = df[df["dataset"] != "fashion_mnist"]
+        df = df[df["dataset"] != "text2image-angular-200-10M"]
         print(df)
 
 
@@ -1454,7 +1460,16 @@ rule paper_correlations_table:
         })
         corrs = corrs.pivot(columns="dataset", index="metric")["correlation"]
 
-        corrs.style.format(precision=2).to_latex(output[0])
+        # corrs.style.format(precision=2).apply(highlight_max, axis=1).to_latex(output[0])
+        for column in corrs.columns:
+            if is_numeric_dtype(corrs[column]):
+                maxval = corrs[column].max()
+                corrs[column] = [
+                    "\\textbf{%.2f}" % v if v == maxval else "%.2f" % v
+                    for v in corrs[column].values
+                ]
+
+        corrs.style.to_latex(output[0], column_format="l" + "r" * len(corrs.columns))
 
 
 rule paper_correlations_bars:
