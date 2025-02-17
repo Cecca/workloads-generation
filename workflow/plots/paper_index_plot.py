@@ -9,17 +9,21 @@ SELECTION = ["astro", "deep1b", "glove", "sald"]
 k = int(snakemake.wildcards["k"])
 
 # read and clean data
-metrics = pd.read_csv(snakemake.input[1])[["i", "rc_10", "rc_1", "dataset", "workload_description"]]
+metrics = pd.concat((
+    pd.read_csv(snakemake.input[1]),
+    pd.read_csv(snakemake.input[4])
+))
+metrics = metrics[["i", "rc_10", "rc_1", "dataset", "workload_description"]]
 metrics = metrics.rename(columns={"workload_description": "workload", "i": "query_index"})
 metrics["k"] = np.where(metrics["rc_10"].isna(), 1, 10)
 metrics["rc"] = np.where(metrics["rc_10"].isna(), metrics["rc_1"], metrics["rc_10"])
 
 perf_dstree = pd.read_csv(snakemake.input[2])
-print(perf_dstree)
 
 perf = pd.read_csv(snakemake.input[0])
 perf = perf[( perf["index_name"] != "dstree" ) | (perf["workload"].str.startswith("File"))]
-perf = pd.concat([perf, perf_dstree])
+perf = pd.concat([perf, perf_dstree,  pd.read_csv(snakemake.input[3])])
+perf = perf[perf["dataset"] != "text2image-angular-200-10M"]
 perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 perf = perf[perf["k"] == k]
 perf.rename(columns={"index_name": "index"}, inplace=True)

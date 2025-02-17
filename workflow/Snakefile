@@ -1297,6 +1297,8 @@ rule paper_index_plot:
       "results_nefeli/metrics/index-performance.csv",
       "results_nefeli/metrics/all-metrics.csv",
       "results_nefeli/metrics/index-performance-dstree-fixed.csv",
+      "results_nefeli/metrics/index-performance-text2image.csv",
+      "results_nefeli/metrics/all-metrics-text2image.csv",
     output: 
       "paper/index-k{k}.png",
       "paper/index-k{k}-selection.png",
