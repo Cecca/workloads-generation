@@ -15,6 +15,7 @@ df = pd.concat((
 df = df[df["dataset"] != "text2image-angular-200-10M"]
 df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
 df = df[df["dataset"] != "fashion_mnist"]
+df = df[df["dataset"] != "rw"]
 
 # remove outliers
 q = df[metric].quantile(0.99)
