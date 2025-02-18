@@ -1,8 +1,16 @@
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from icecream import ic
 import pandas as pd
+
+DIFFICULTY_COLORS = dict(
+    zip(["easy", "medium", "hard"],
+    reversed(mpl.cm.viridis.resampled(3).colors))
+)
+DIFFICULTY_COLORS["-"] = "#515151"
+ic(DIFFICULTY_COLORS)
 
 SELECTION = ["astro", "deep1b", "glove", "sald"]
 
@@ -68,8 +76,24 @@ perf = perf.groupby(["dataset", "index", "method", "difficulty"], as_index=False
 perf["distcomp"] = np.minimum(perf["distcomp"], 1.0)
 print(perf[( perf["method"] == "GaussianNoise" ) & (perf["index"] == "DSTree")])
 
+
 def doplot(data, **kwargs):
-    ax = sns.barplot(data, **kwargs)
+    sns.barplot(
+        data,
+        width=0.8,
+        gap=0.7,
+        palette=DIFFICULTY_COLORS,
+        **kwargs
+    )
+    sns.stripplot(
+        data,
+        jitter=False,
+        dodge=True,
+        palette=DIFFICULTY_COLORS,
+        linewidth=0.4,
+        edgecolor="gray",
+        **kwargs
+    )
 
 
 def doscatter(data, **kwargs):
@@ -80,7 +104,7 @@ def doscatter(data, **kwargs):
         hue="method",
         style="difficulty",
         s=100,
-        palette="tab10"
+        # palette="tab10"
     )
     sns.lineplot(
         data,
@@ -89,7 +113,7 @@ def doscatter(data, **kwargs):
         hue="method",
         # style="method",
         linewidth=1,
-        palette="tab10"
+        # palette="tab10"
     )
     xmax = data["rc"].max()
     ic(xmax, data["dataset"].unique())
@@ -106,7 +130,7 @@ g = sns.FacetGrid(
 )
 #g.set(xscale="log")
 g.map_dataframe(
-    doplot, x="distcomp", y="method", hue="difficulty", palette="tab10"#, errorbar=None
+    doplot, x="distcomp", y="method", hue="difficulty", #palette="tab10"#, errorbar=None
 )
 g.add_legend()
 g.savefig(snakemake.output[0])
@@ -119,7 +143,7 @@ g = sns.FacetGrid(
 )
 #g.set(xscale="log")
 g.map_dataframe(
-    doplot, x="distcomp", y="method", hue="difficulty", palette="tab10"#, errorbar=None
+    doplot, x="distcomp", y="method", hue="difficulty", #palette="tab10"#, errorbar=None
 )
 # g.add_legend()
 g.savefig(snakemake.output[1])
@@ -136,7 +160,7 @@ g.map_dataframe(
     # style="difficulty",
     size="difficulty",
     sizes=(100, 100),
-    palette="tab10"
+    # palette="tab10"
 )
 g.add_legend()
 
