@@ -1408,6 +1408,7 @@ rule paper_correlations_table:
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
         df = df[df["dataset"] != "fashion_mnist"]
         df = df[df["dataset"] != "text2image-angular-200-10M"]
+        df = df[df["dataset"] != "rw"]
         print(df)
 
 
@@ -1460,12 +1461,21 @@ rule paper_correlations_table:
         })
         corrs = corrs.pivot(columns="dataset", index="metric")["correlation"]
 
+        def format_by_rank(v, rankedvals):
+            if v == rankedvals[0]:
+                return "\\underline{%.2f}" % v
+            elif v == rankedvals[1]:
+                return "\\textbf{%.2f}" % v
+            else:
+                return "%.2f" % v
+
         # corrs.style.format(precision=2).apply(highlight_max, axis=1).to_latex(output[0])
         for column in corrs.columns:
             if is_numeric_dtype(corrs[column]):
+                rankedvals = sorted(corrs[column].values, reverse=True)
                 maxval = corrs[column].max()
                 corrs[column] = [
-                    "\\textbf{%.2f}" % v if v == maxval else "%.2f" % v
+                    format_by_rank(v, rankedvals)
                     for v in corrs[column].values
                 ]
 

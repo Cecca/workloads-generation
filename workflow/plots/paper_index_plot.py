@@ -32,6 +32,7 @@ perf = pd.read_csv(snakemake.input[0])
 perf = perf[( perf["index_name"] != "dstree" ) | (perf["workload"].str.startswith("File"))]
 perf = pd.concat([perf, perf_dstree,  pd.read_csv(snakemake.input[3])])
 perf = perf[perf["dataset"] != "text2image-angular-200-10M"]
+perf = perf[perf["dataset"] != "rw"]
 perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 perf = perf[perf["k"] == k]
 perf.rename(columns={"index_name": "index"}, inplace=True)
@@ -132,7 +133,7 @@ g = sns.FacetGrid(
 g.map_dataframe(
     doplot, x="distcomp", y="method", hue="difficulty", #palette="tab10"#, errorbar=None
 )
-g.add_legend()
+# g.add_legend()
 g.savefig(snakemake.output[0])
 
 
