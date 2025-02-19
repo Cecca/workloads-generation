@@ -1405,9 +1405,9 @@ rule paper_correlations_table:
             pd.read_csv(input[0]),
             pd.read_csv(input[1]),
         ))
+        df = df[df["dataset"] != "text2image-euclidean-200-10M"]
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
         df = df[df["dataset"] != "fashion_mnist"]
-        df = df[df["dataset"] != "text2image-angular-200-10M"]
         df = df[df["dataset"] != "rw"]
         print(df)
 
