@@ -1302,7 +1302,7 @@ rule paper_index_plot:
     output: 
       "paper/index-k{k}.png",
       "paper/index-k{k}-selection.png",
-      "paper/index-k{k}-scatter.png"
+      # "paper/index-k{k}-scatter.png"
     script: "plots/paper_index_plot.py"
 
 

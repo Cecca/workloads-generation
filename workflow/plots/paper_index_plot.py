@@ -31,8 +31,7 @@ perf_dstree = pd.read_csv(snakemake.input[2])
 perf = pd.read_csv(snakemake.input[0])
 perf = perf[( perf["index_name"] != "dstree" ) | (perf["workload"].str.startswith("File"))]
 perf = pd.concat([perf, perf_dstree,  pd.read_csv(snakemake.input[3])])
-perf = perf[perf["dataset"] != "text2image-angular-200-10M"]
-perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
+perf = perf[perf["dataset"] != "text2image-euclidean-200-10M"]
 perf = perf[perf["k"] == k]
 perf.rename(columns={"index_name": "index"}, inplace=True)
 perf.replace("File.*", "Baseline", regex=True, inplace=True)
@@ -70,9 +69,9 @@ perf = perf[perf["dataset"] != "fashion"]
 perf["index"] = pd.Categorical(
     perf["index"], categories=["MESSI", "DSTree", "IVF", "HNSW"], ordered=True
 )
-perf = perf[np.isfinite(perf["rc"])]
+# perf = perf[np.isfinite(perf["rc"])]
 
-perf = perf.groupby(["dataset", "index", "method", "difficulty"], as_index=False)[["rc", "distcomp"]].mean()
+perf = perf.groupby(["dataset", "index", "method", "difficulty"], as_index=False)[["distcomp"]].mean()
 # perf = perf[perf["rc"] < 10]
 perf["distcomp"] = np.minimum(perf["distcomp"], 1.0)
 print(perf[( perf["method"] == "GaussianNoise" ) & (perf["index"] == "DSTree")])
@@ -149,20 +148,22 @@ g.map_dataframe(
 # g.add_legend()
 g.savefig(snakemake.output[1])
 
-g = sns.FacetGrid(
-    data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
-    margin_titles=True
-)
-g.map_dataframe(
-    doscatter,
-    x="rc",
-    y="distcomp",
-    hue="method",
-    # style="difficulty",
-    size="difficulty",
-    sizes=(100, 100),
-    # palette="tab10"
-)
-g.add_legend()
+# perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
 
-g.savefig(snakemake.output[2])
+# g = sns.FacetGrid(
+#     data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
+#     margin_titles=True
+# )
+# g.map_dataframe(
+#     doscatter,
+#     x="rc",
+#     y="distcomp",
+#     hue="method",
+#     # style="difficulty",
+#     size="difficulty",
+#     sizes=(100, 100),
+#     # palette="tab10"
+# )
+# g.add_legend()
+
+# g.savefig(snakemake.output[2])
