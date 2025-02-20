@@ -89,5 +89,6 @@ for (i, j, _), fdata in g.facet_data():
         ax.set_xticks(ticks=[], labels=[], minor=True)
 
 g.tight_layout(pad=0)
+g.set_ylabels("Empirical hardness")
 g.savefig(snakemake.output[0])
 

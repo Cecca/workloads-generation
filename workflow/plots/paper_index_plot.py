@@ -133,6 +133,7 @@ g.map_dataframe(
     doplot, x="distcomp", y="method", hue="difficulty", #palette="tab10"#, errorbar=None
 )
 # g.add_legend()
+g.set_xlabels("Empirical hardness")
 g.savefig(snakemake.output[0])
 
 
@@ -146,6 +147,7 @@ g.map_dataframe(
     doplot, x="distcomp", y="method", hue="difficulty", #palette="tab10"#, errorbar=None
 )
 # g.add_legend()
+g.set_xlabels("Empirical hardness")
 g.savefig(snakemake.output[1])
 
 # perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
