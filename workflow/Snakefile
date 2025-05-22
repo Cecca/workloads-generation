@@ -1583,3 +1583,9 @@ rule empirical_workload_results:
     output: "paper/empirical-workload.png"
     script: "plots/empirical_workload_results.py"
 
+
+rule compare_queries:
+    input:
+      index_perf = "results_nefeli/metrics/index-performance.csv"
+    output: "paper/compare_queries.tex"
+    script: "scripts/compare_queries.py"

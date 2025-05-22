@@ -43,6 +43,7 @@
             radian
             faiss
             networkx
+            polars
           ]) ++
           (with pkgs.rPackages; [
             tidyverse
