@@ -1482,6 +1482,114 @@ rule paper_correlations_table:
         corrs.style.to_latex(output[0], column_format="l" + "r" * len(corrs.columns))
 
 
+rule paper_correlations_table_general:
+    input:
+        "results_nefeli/metrics/index-performance.csv",
+        "results_nefeli/metrics/all-metrics.csv"
+    output:
+        "paper/correlations-table-{empirical}.tex",
+    run:
+        import pandas as pd
+        import numpy as np
+        import seaborn.objects as so
+        import matplotlib
+        import matplotlib.pyplot as plt
+        from pandas.api.types import is_numeric_dtype
+
+        df = pd.read_csv(input[0])
+        df = df[df["dataset"] != "text2image-euclidean-200-10M"]
+        df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
+        df = df[df["dataset"] != "fashion_mnist"]
+        df = df[df["dataset"] != "rw"]
+        df = df[df["k"] == 10]
+        df = df[["dataset", "workload", "query_index", "index_name", "distcomp"]]
+
+        metrics = pd.read_csv(input[1]).rename(columns={"i": "query_index", "workload_description": "workload"})
+        metrics = metrics[["dataset", "workload", "query_index", "lid_10", "rc_10", "exp_20|10", "eps_0.05", "eps_0.1", "eps_0.5", "eps_1"]]
+        metrics["dataset"] = metrics["dataset"].str.replace("-.*", "", regex=True)
+        df = df.merge(metrics, on=["dataset", "workload", "query_index"]).dropna()
+        df = df.sort_values(["dataset", "workload", "query_index", "index_name"])
+        df = df.pivot(
+            columns="index_name",
+            index=["dataset", "workload", "query_index", "rc_10", "lid_10", "exp_20|10", "eps_0.05", "eps_0.1", "eps_0.5", "eps_1"],
+            values="distcomp"
+        ).reset_index()
+
+        def quantizer(group, column="rc_10", empirical="faiss_ivf"):
+            group = group[np.isfinite(group[column])].copy()
+            try:
+                group["binned_col"] = pd.qcut(group[column], 100)
+            except:
+                group["binned_col"] = pd.cut(group[column], 100)
+            group = group.groupby("binned_col", observed=True)[[column, empirical]].mean().dropna().reset_index(drop=True)
+            return group
+
+
+        def quantize_by(df, column="rc_10", empirical="faiss_ivf"):
+            df = df.groupby("dataset").apply(quantizer, column, empirical, include_groups=False).reset_index()
+            del df["level_1"]
+            corrs = df.groupby("dataset").corr("kendall")[empirical].reset_index()
+            corrs = corrs[corrs[df.columns.name] != empirical]
+            corrs.reset_index(inplace=True)
+            corrs = corrs[["dataset", empirical]]
+            corrs.set_index("dataset", inplace=True)
+            corrs.columns = [column]
+            return df, corrs
+
+        empirical = wildcards["empirical"]
+
+        dfs = []
+        for metric in ["lid_10", "rc_10", "exp_20|10"] + ["eps_" + str(e) for e in [ 0.05, 0.1, 0.5, 1 ]]:
+            # remove outliers
+            if metric in ["rc_10", "exp_20|10"]:
+                q = df[metric].quantile(0.99)
+                ldf = df[df[metric] < q]
+            else:
+                ldf = df.copy()
+            _f, corrs = quantize_by(ldf, metric, empirical)
+            dfs.append(corrs)
+
+        corrs = dfs[0]
+        for df in dfs[1:]:
+            corrs = pd.merge(corrs, df, left_index=True, right_index=True)
+        corrs = corrs.stack().reset_index()
+        corrs.columns = ["dataset", "metric", "correlation"]
+        #corrs["sign"] = corrs["correlation"] > 0
+        corrs["correlation"] = np.abs( corrs["correlation"] )
+
+        corrs["metric"] = corrs["metric"].replace({
+          "lid_10": "$LID_{10}$",
+          "rc_10": "$RC_{10}$",
+          "exp_20|10": "$Exp_{20|10}$",
+          "eps_0.05": r"$\alpha_{0.05, 10}$",
+          "eps_0.1": r"$\alpha_{0.1, 10}$",
+          "eps_0.5": r"$\alpha_{0.5, 10}$",
+          "eps_1": r"$\alpha_{1, 10}$",
+        })
+        corrs = corrs.pivot(columns="dataset", index="metric")["correlation"]
+        print(corrs)
+
+        def format_by_rank(v, rankedvals):
+            if v == rankedvals[0]:
+                return "\\underline{%.2f}" % v
+            elif v == rankedvals[1]:
+                return "\\textbf{%.2f}" % v
+            else:
+                return "%.2f" % v
+
+        # corrs.style.format(precision=2).apply(highlight_max, axis=1).to_latex(output[0])
+        for column in corrs.columns:
+            if is_numeric_dtype(corrs[column]):
+                rankedvals = sorted(corrs[column].values, reverse=True)
+                maxval = corrs[column].max()
+                corrs[column] = [
+                    format_by_rank(v, rankedvals)
+                    for v in corrs[column].values
+                ]
+
+        corrs.style.to_latex(output[0], column_format="l" + "r" * len(corrs.columns))
+        
+
 rule paper_correlations_bars:
     input:
         "results_nefeli/metrics/all-metrics.csv"
