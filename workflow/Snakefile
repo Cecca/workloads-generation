@@ -1485,6 +1485,8 @@ rule paper_correlations_table:
 rule paper_correlations_table_general:
     input:
         "results_nefeli/metrics/index-performance.csv",
+        "results_nefeli/metrics/index-performance-text2image.csv",
+        "results_nefeli/metrics/all-metrics-text2image.csv",
         "results_nefeli/metrics/all-metrics.csv"
     output:
         "paper/correlations-table-{empirical}.tex",
@@ -1496,7 +1498,7 @@ rule paper_correlations_table_general:
         import matplotlib.pyplot as plt
         from pandas.api.types import is_numeric_dtype
 
-        df = pd.read_csv(input[0])
+        df = pd.concat((pd.read_csv(input[0]), pd.read_csv(input[1])))
         df = df[df["dataset"] != "text2image-euclidean-200-10M"]
         df["dataset"] = df["dataset"].str.replace("-.*", "", regex=True)
         df = df[df["dataset"] != "fashion_mnist"]
@@ -1504,11 +1506,19 @@ rule paper_correlations_table_general:
         df = df[df["k"] == 10]
         df = df[["dataset", "workload", "query_index", "index_name", "distcomp"]]
 
-        metrics = pd.read_csv(input[1]).rename(columns={"i": "query_index", "workload_description": "workload"})
+        metrics = pd.concat((
+            pd.read_csv(input[2]),
+            pd.read_csv(input[3])
+        )).rename(columns={"i": "query_index", "workload_description": "workload"})
+        metrics = metrics.dropna(subset=["lid_10"])
+        metrics = metrics[metrics["dataset"] != "text2image-euclidean-200-10M"]
         metrics = metrics[["dataset", "workload", "query_index", "lid_10", "rc_10", "exp_20|10", "eps_0.05", "eps_0.1", "eps_0.5", "eps_1"]]
         metrics["dataset"] = metrics["dataset"].str.replace("-.*", "", regex=True)
+        # print(metrics[(metrics["dataset"] == "text2image") & (metrics["workload"] == "SGD(rc, medium)")])
         df = df.merge(metrics, on=["dataset", "workload", "query_index"]).dropna()
         df = df.sort_values(["dataset", "workload", "query_index", "index_name"])
+        # print(df[df["dataset"] == "text2image"][["workload", "query_index", "index_name", "rc_10"]])
+        df = df.groupby(["dataset", "workload", "index_name", "query_index"]).first().reset_index()
         df = df.pivot(
             columns="index_name",
             index=["dataset", "workload", "query_index", "rc_10", "lid_10", "exp_20|10", "eps_0.05", "eps_0.1", "eps_0.5", "eps_1"],
