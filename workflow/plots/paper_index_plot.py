@@ -150,22 +150,22 @@ g.map_dataframe(
 g.set_xlabels("Empirical hardness")
 g.savefig(snakemake.output[1])
 
-# perf = pd.merge(perf, metrics, on=["dataset", "workload", "query_index", "k"])
-
-# g = sns.FacetGrid(
-#     data=perf, col="dataset", row="index", sharex=False, sharey=True, legend_out=True, height=2.2,
-#     margin_titles=True
-# )
-# g.map_dataframe(
-#     doscatter,
-#     x="rc",
-#     y="distcomp",
-#     hue="method",
-#     # style="difficulty",
-#     size="difficulty",
-#     sizes=(100, 100),
-#     # palette="tab10"
-# )
+presentation_data = perf[perf["dataset"].isin(["deep1b", "sald"])]
+presentation_data = presentation_data[presentation_data["method"].isin(["Baseline", "Hephaestus-Gradient"])]
+presentation_data["method"] = presentation_data["method"].astype(str)
+presentation_data.replace({"Hephaestus-Gradient": "Hephaestus"}, inplace=True)
+print(presentation_data)
+g = sns.FacetGrid(
+    data=presentation_data,
+    col="index", row="dataset",
+    sharex=False, sharey=True, legend_out=True, height=2,
+    margin_titles=True
+)
+g.map_dataframe(
+    doplot, x="distcomp", y="method", hue="difficulty"
+)
 # g.add_legend()
+g.set_xlabels("Empirical hardness")
+g.savefig(snakemake.output[2])
 
-# g.savefig(snakemake.output[2])
+

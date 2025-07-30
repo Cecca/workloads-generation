@@ -1242,6 +1242,9 @@ rule paper_all:
         "paper/correlations_rc_10.png",
         "paper/correlations_exp_20|10.png",
         "paper/correlations_lid_10.png",
+        "paper/selected_correlations_rc_10.png",
+        "paper/selected_correlations_exp_20|10.png",
+        "paper/selected_correlations_lid_10.png",
     #"paper/correlations_eps_1.png",
     #"paper/correlations_eps_0.5.png",
     #"paper/correlations_eps_0.05.png",
@@ -1302,6 +1305,7 @@ rule paper_index_plot:
     output: 
       "paper/index-k{k}.png",
       "paper/index-k{k}-selection.png",
+      "paper/index-k{k}-presentation.png",
       # "paper/index-k{k}-scatter.png"
     script: "plots/paper_index_plot.py"
 
@@ -1378,6 +1382,11 @@ rule paper_correlations_specific:
     input: "results_nefeli/metrics/all-metrics.csv", "results_nefeli/metrics/all-metrics-text2image.csv"
     output: "paper/correlations_{metric}.png",
     script: "plots/paper_correlations_specific.py"
+
+rule paper_correlations_specific_selected:
+    input: "results_nefeli/metrics/all-metrics.csv", "results_nefeli/metrics/all-metrics-text2image.csv"
+    output: "paper/selected_correlations_{metric}.png",
+    script: "plots/paper_selected_correlations_specific.py"
 
 
 rule paper_correlations_table:
